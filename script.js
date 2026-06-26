@@ -38,7 +38,7 @@ if (loginForm) {
     });
 
 }
-
+//forms
 if (signupForm) {
     signupForm.addEventListener("submit", function(event) {
         event.preventDefault();
