@@ -11,9 +11,11 @@
     <link rel="stylesheet" href="style.css">
   </head>
   
+  
+
   <body>
     <main>
-      <section>
+      <section class="auth-card">
         <h1>
           Start your journey to financial literacy today!
         </h1>
@@ -30,7 +32,11 @@
             type="text"
             id="fullName"
             name="fullName"
+            minlength="2"
+            maxlength="64"
             placeholder="Enter your full name"
+            autocomplete="name"
+            pattern="[A-Za-z\s'-]+"
             required
           >
           
@@ -42,6 +48,8 @@
             id="email"
             name="email"
             placeholder="Enter your email"
+            autocomplete="email"
+            autocapitalize="none"
             required
           >
 
@@ -53,6 +61,11 @@
             id="password"
             name="password"
             placeholder="Enter your password"
+            autocomplete="new-password"
+            minlength="8"
+            maxlength="64"
+            pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$"
+            title="Must contain at least one uppercase letter, one lowercase letter, and one number."
             required
           >
 
@@ -64,6 +77,9 @@
             id="passwordConfirmation"
             name="passwordConfirmation"
             placeholder="Confirm your password"
+            autocomplete="new-password"
+            minlength="8"
+            maxlength="64"
             required
           >
 
@@ -80,6 +96,19 @@
           </a>
         </p>
       </section>
+
+      <section class="auth-visual">
+        <h2>
+          Build better money habits day by day with our assistant
+        </h2>
+        <p>
+          Use simple budgeting tools, Kakeibo system reflection, and clear spending categories.
+        </p>
+         <p>
+            Needs  Wants  Savings
+          </p>
+      </section>
     </main>
+    <script src="script.js"></script>
   </body>
 </html>

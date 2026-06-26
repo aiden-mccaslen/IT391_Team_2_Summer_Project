@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <title>
-        Login | Meticulous Budgeting
+        Login  Meticulous Budgeting
     </title>
 
     <link rel="stylesheet" href="style.css">
   </head>
-  
+
   <body>
     <main>
-      <section>
+      <section class="auth-card">
         <h1>
           It is nice to see you again!
         </h1>
@@ -31,6 +31,7 @@
             id="email"
             name="email"
             placeholder="Enter your email"
+            autocomplete="email"
             required
           >
 
@@ -42,6 +43,8 @@
             id="password"
             name="password"
             placeholder="Enter your password"
+            autocomplete="current-password"
+            minlength="8"
             required
           >
 
@@ -58,6 +61,25 @@
           </a>
         </p>
       </section>
+      <section class="auth-visual">
+        <h2>
+          Build better money habits day by day with our assistant
+        </h2>
+
+        <p>
+          Track your spending, recieve analysis, improve understanding of your finances and make smarter financial descisions.
+        </p>
+
+        <div class="budget-preview">
+          <p>
+            50 / 30 / 20
+          </p>
+           <p>
+            Needs  Wants  Savings
+          </p>
+        </div>
+      </section>
     </main>
+    <script src="script.js"></script>
   </body>
 </html>
