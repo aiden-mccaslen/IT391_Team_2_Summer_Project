@@ -20,11 +20,11 @@ if (loginForm) {
 
         const passwordInput = document.getElementById("password");
         const password = passwordInput.value;
-
+        
         //check
         console.log(email); 
         console.log(password);
-
+        
         //backend package
         const loginData = {
             email: email,
@@ -38,7 +38,6 @@ if (loginForm) {
     });
 
 }
-
 //forms
 if (signupForm) {
     signupForm.addEventListener("submit", function(event) {
@@ -52,7 +51,7 @@ if (signupForm) {
 
         const passwordInput = document.getElementById("password");
         const password = passwordInput.value;
-
+        
          const passwordConfirmationInput = document.getElementById("passwordConfirmation");
          const passwordConfirmation = passwordConfirmationInput.value;
 
@@ -73,10 +72,10 @@ if (signupForm) {
             email: email,
             password: password
         };
-
+        
         //check
         console.log(signupData);
-
+        
         sendSignupRequest(signupData);
     });
 }
