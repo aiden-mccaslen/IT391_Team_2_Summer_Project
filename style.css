@@ -1,0 +1,151 @@
+/* Colors */
+:root {
+    --background-color: #F5F4FB;
+    --card-color: #FFFFFF;
+
+    --primary-color: #6C63FF;
+    --primary-hover-color: #5A52E8;
+
+    --accent-color: #6FCF97;
+
+    --text-color: #2D2D3A;
+    --secondary-text-color: #6F7287;
+
+    --border-color: #D8DAE8;
+
+    --error-color: #E74C3C;
+    --success-color: #6FCF97;
+}
+
+/* General Layout */
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+main {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 60px;
+    padding: 40px;
+}
+
+
+/* Cards */
+.auth-card,
+.auth-visual {
+    min-height: 560px;
+    padding: 56px;
+    border-radius: 20px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+.auth-card {
+    width: 420px;
+    background-color: var(--card-color);
+}
+
+.auth-visual {
+    width: 460px;
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.auth-visual p {
+    color: white;
+}
+
+
+/* Filling text */
+h1 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 42px;
+}
+
+p {
+    color: var(--secondary-text-color);
+    line-height: 1.5;
+}
+
+
+/* Forms*/
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+label {
+    margin-top: 12px;
+
+    font-weight: bold;
+}
+
+input {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+
+/* Buttons */
+
+button {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: var(--primary-hover-color);
+}
+
+/* I got carried away */
+input::placeholder {
+    color: var(--secondary-text-color);
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+.auth-card p:last-child {
+    margin-top: 20px;
+}
+
+.auth-visual {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.auth-visual h2 {
+    color: white;
+}
+button {
+    transition: background-color 0.2s ease;
+}
+
+a {
+    color: var(--primary-color);
+    font-weight: bold;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
