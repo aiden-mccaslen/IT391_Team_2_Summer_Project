@@ -7,7 +7,7 @@ Create venv (windows)
     python -m venv myVenv
     .\myVenv\Scripts\Activate.ps1
 
-TO install requirements
+To install requirements
     pip install -r requirements.txt
 
 To add to requirements
