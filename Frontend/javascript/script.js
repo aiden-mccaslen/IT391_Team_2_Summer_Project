@@ -93,6 +93,14 @@ async function sendLoginRequest(loginData) {
 
         const result = await response.json();
 
+        if (result.success) {
+            window.location.href = "../html/home.html";
+        }
+        else
+        {
+            alert(result.message);
+        }
+
         console.log("Login response:", result);
     } catch (error) {
         console.error("Login request failed:", error);
