@@ -13,3 +13,16 @@ To install requirements
 To add to requirements
     pip freeze > requirements.txt (after installing dependencies)
 
+To run the app
+    make sure the requirements are installed (check above command)
+    run 'python app.py' (in the backend folder)
+    install live server by Ritwick Dey on vs code
+    open your html page with live server (right click the html file and open with liveserver)
+
+To close the app
+    press ctrl + c on the terminal to close the flask app
+    close the webpage
+
+Important notes
+    DO NOT try to use the http link flask gives you, it will not work (for now, working on fixing it)
+    Put all files in the apporpriate folders and do not move the files, the program is very sensitive and moving files will break the program
