@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 import os
-from supabase import create_client, Client, AuthApiError
-
+from supabase import create_client, Client
 
 load_dotenv()
 
@@ -12,45 +11,29 @@ supabase_client : Client = create_client(url, key)
 def signup(name, email, password):
 # supabase checks length of password (password should be > 8 chars long)
 # can implement other password rules as required
-    try:
-        response = supabase_client.auth.sign_up({"email": email, "password": password,
-                                                "options": {
-                                                        "data":{
-                                                                "full_name": name,
-                                                                "display_name": name,
-                                                        }
-                                                }
-        })
-        # Response contains: {'user': {'email': '...', ...}}
+    response = supabase_client.auth.sign_up({"email": email, "password": password,
+                                             "options": {
+                                                 "data":{
+                                                     "full_name": name,
+                                                     "display_name": name,
+                                                 }
+                                             }})
+    # Response contains: {'user': {'email': '...', ...}}
 
-        if (response != None):
-            return (True, "No errors")
-        
-        return (False, "Unknown error has occured")
-    except AuthApiError as e:
-        return (False,  str(e))
-    except Exception as e:
-        return (False,  str(e))
+    if (response != None):
+        return (True, "No errors")
+    
+    return (False, "Unknown error has occured")
 
 def login(email, password):
-    try:
-        response = supabase_client.auth.sign_in_with_password({"email": email, "password": password})
-        # Response contains: {'access_token': '...', 'refresh_token': '...', 'user': {...}}
+    response = supabase_client.auth.sign_in_with_password({"email": email, "password": password})
+    # Response contains: {'access_token': '...', 'refresh_token': '...', 'user': {...}}
 
-        if (response != None):
-            return (True, "No error")
-        
-        return (False, "Username or password incorrect")
-    except AuthApiError as e:
-        return (False,  str(e))
-    except Exception as e:
-        return (False,  str(e))
+    if (response != None):
+        return (True, "No error")
+    
+    return (False, "Unknown error has occured")
 
 def logout():
-    try:
-        supabase_client.auth.sign_out()
-    except AuthApiError as e:
-        return (False,  str(e))
-    except Exception as e:
-        return (False,  str(e))
+    supabase_client.auth.sign_out()
     # Returns: None
