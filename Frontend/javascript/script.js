@@ -8,7 +8,7 @@ console.log(loginForm);
 console.log(signupForm);
 
 //backend URL
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://localhost:5000"; // changed to match flask deafult api
 
 //events
 if (loginForm) {
@@ -112,6 +112,16 @@ async function sendSignupRequest(signupData) {
         });
 
         const result = await response.json();
+
+        // redirects to login page on success and gives error message on fail
+
+        if (result.success) {
+            window.location.href = "../html/login.html";
+        }
+        else
+        {
+            alert(result.message);
+        }
 
         console.log("Signup response:", result);
     } catch (error) {
