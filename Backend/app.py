@@ -27,7 +27,7 @@ def signup(): # can only have 1 function per flask route
     })
 '''
 
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
     return login.html
 
