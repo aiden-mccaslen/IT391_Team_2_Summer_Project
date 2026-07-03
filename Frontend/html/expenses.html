@@ -3,7 +3,8 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Expenses</title>
-        <link rel="stylesheet" href="style.css" type="text/css">
+        <link rel="stylesheet" href="../css/style.css" type="text/css">
+        <link rel="stylesheet" href="../css/expenses.css" type="text/css">
 
     </head>
 
@@ -15,18 +16,123 @@
         </nav>
     </header>
 
+    <div class="expenses_welcome">
+        <h2>
+            Enter your expenses here!
+        </h2>
+    </div>
+
     <main>
-        <h>
-            Track your expenses here!
-            <input id="test" type="number" placeholder="Type expense here"/>
-        </h>
-        <button onclick="handleIn()">Save expense</button>
-        <button onclick="clearIn()">Clear</button>
-        <p id="feedback"></p>
+
+        <form id="expenseForm">
+            <fieldset>
+                <legend>Type of Expense</legend>
+                <label for="amount">Amount ($)</label>      
+                <input
+                    type="number"
+                    id="amount"
+                    name="amount"
+                    placeholder="Enter your the amount of this expense"
+                    required
+                >
+                <br>
+
+                <label for="date">Date Purchased</label>
+                <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    
+                /> <!-- Leaving this as not required since people might forget the date of a purchase -->
+                <br>
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Rent/Mortgage"
+                    value="Rent/Mortgage"
+                    required
+                />
+                <label for="Rent/Mortgage">Rent/Mortgage</label>
+                <br>
+                    
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Utilities"
+                    value="Utilities"
+                />
+                <label for="Utilities">Utilities</label>
+                <br>
+
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Car Payment"
+                    value="Car Payment"
+                />
+                <label for="Car Payment">Car Payment</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Car Insurance"
+                    value="Car Insurance"
+                />
+                <label for="Car Insurance">Car Insurance</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Streaming Services"
+                    value="Streaming services"
+                />
+                <label for="Streaming Services">Streaming Services</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Groceries"
+                    value="Groceries"
+                />
+                <label for="Groceries">Groceries</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Personal"
+                    value="Personal"
+                />
+                <label for="Personal">Personal</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="expense"
+                    id="Unexpected"
+                    value="Unexpected"
+                />
+                <label for="Unexpected">Unexpected</label>
+                <br>
+
+                
+                
+
+
+                <br>
+                <input type="submit"/>
+            </fieldset>
+        </form>
+        <pre id="log"></pre>
+        <p>Getting started on tracking expenses</p>
     </main>
 
     <body>
-        <p>Getting started on tracking expenses</p>
-        <script src="expenses.js"></script>
+        <script src="../javascript/expenses.js"></script>
     </body>
 </html>

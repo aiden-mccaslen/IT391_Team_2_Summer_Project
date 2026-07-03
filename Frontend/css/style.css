@@ -26,6 +26,15 @@ body {
     color: var(--text-color);
 }
 
+header {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    padding: 5px;
+}
+
 main {
     min-height: 100vh;
     display: flex;
@@ -74,7 +83,7 @@ p {
 }
 
 
-/* Forms*/
+/* Forms */
 
 form {
     display: flex;

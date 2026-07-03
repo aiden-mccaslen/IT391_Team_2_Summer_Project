@@ -1,0 +1,36 @@
+/* Colors */
+:root {
+    /* 
+    Note to self:
+    --colorName: #FFFFFF; 
+    somethingColor: var(--colorName);
+    */
+    --temp: #FFFFFF;
+}
+
+main {
+    inherits: all;
+    padding: 40px;
+    min-height: 5vh;
+    display: inline-block;
+}
+
+.option_label {
+    /* margin-top: px;
+    display: grid; */
+    align-items: left;
+    /* font-weight: bold; */
+}
+
+.expenses_welcome {
+    min-height: 5vh;
+    justify-content: center;
+    align-items: center;
+    padding-left: 40px;
+    padding-right: 40px;
+}
+
+form {
+    display: inline;
+    justify-content: left;
+}
