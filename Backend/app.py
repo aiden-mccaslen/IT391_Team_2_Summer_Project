@@ -3,6 +3,7 @@
 from  flask import request, Flask, jsonify, url_for, redirect
 from flask_cors import CORS
 import user as user_file
+import kakeibo_ai
 
 
 app = Flask(__name__)
@@ -46,6 +47,19 @@ def signup():
     data = request.get_json()
     status = user_file.signup(data["name"], data["email"], data["password"])
     # status returns a tuple (true or false depending on suscessful login, error message)
+    return jsonify ({
+        "success": status[0],
+        "message": status[1]
+    })
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.get_json() # turn what javascript sends to python dictionary
+    # history is the full conversation so far: [{"role": "user"/"assistant", "content": "..."}]
+    # The model API is stateless, so the frontend sends the whole thing each time.
+    history = data["history"]
+    status = kakeibo_ai.ask_coach(history)
+    # status returns a tuple (true or false depending on success, reply text or error message)
     return jsonify ({
         "success": status[0],
         "message": status[1]

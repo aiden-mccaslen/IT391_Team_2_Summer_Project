@@ -1,0 +1,439 @@
+"""
+Kakeibo AI framework for Meticulous Budgeting.
+
+This module is the AI layer of the app. It applies the Japanese "Kakeibo"
+budgeting method: instead of just tracking numbers, it gently makes the user
+reflect on *why* they spend, and coaches them toward better habits.
+
+It is deliberately self-contained:
+  - It does NOT import Flask or Supabase.
+  - It receives plain dicts / lists and returns plain dicts.
+  - Every function returns a (success, payload) tuple, matching the convention
+    already used in user.py (signup/login return (bool, message)).
+
+So the Flask layer (built by a teammate) stays thin:
+    ok, result = reflect_on_purchase("AirPods", 180, "electronics")
+    return jsonify(result) if ok else (jsonify({"error": result}), 502)
+
+Provider: OpenAI (ChatGPT models). Default model: gpt-4o.
+"""
+
+import os
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+
+# Reads OPENAI_API_KEY from the environment (.env). Same pattern as user.py.
+client = OpenAI()
+
+# Default model. Override globally by setting KAKEIBO_MODEL in .env, or
+# per-call by passing model="..." to any function below.
+#
+# Good options: "gpt-4o" (balanced, the default), "gpt-4o-mini" (cheaper, great
+# for a student budget). For the deeper monthly review you can point that one
+# call at a stronger reasoning model via its model= argument.
+#
+# Extendibility note: this framework talks to the model API in exactly one
+# place (_model_call). To change models, set KAKEIBO_MODEL or pass model=...;
+# to swap providers entirely, _model_call is the only function to rewrite.
+DEFAULT_MODEL = os.getenv("KAKEIBO_MODEL", "gpt-4o")
+
+
+# ---------------------------------------------------------------------------
+# The coach persona.
+#
+# This single system prompt sets the voice for EVERY function below. It is the
+# main lever for the AI's tone — tweak this string to change how the coach
+# sounds. No code changes needed.
+# ---------------------------------------------------------------------------
+KAKEIBO_SYSTEM = """You are the Kakeibo coach inside "Meticulous Budgeting", an app that helps
+young people and beginners build healthy money habits.
+
+Your users often feel anxious or ashamed about money and may have very little
+financial knowledge. Your job is to teach and encourage, never to lecture or
+shame.
+
+Voice and rules:
+- Warm, patient, and encouraging. Talk like a supportive mentor, not a bank.
+- Use plain, everyday language. Avoid finance jargon; if you must use a term,
+  explain it in one short phrase.
+- Never shame the user for past spending. Frame everything as learning.
+- Be concrete and brief. Short sentences. No long lectures.
+- Treat budgeting as a skill the user is building, not a set of restrictions.
+
+The Kakeibo method centers on four reflection questions for any purchase:
+  1. Do I need this item?
+  2. Can I live without it?
+  3. How do I feel about spending this money?
+  4. Did I rush into this purchase?
+
+The goal is always to help the user understand their own habits and make a
+choice they feel good about — not to simply tell them "no"."""
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+def _model_call(messages, *, system, model=None, max_tokens=1500,
+                schema=None, schema_name="response"):
+    """The single place this framework talks to the model API (OpenAI).
+
+    Every function routes through here, so changing models — or swapping in a
+    different provider entirely — is a one-spot change. Pass `model` to override
+    the default for a single call; leave it None to use DEFAULT_MODEL.
+
+    `messages` is the conversation (user/assistant turns). The system prompt is
+    prepended automatically. If `schema` is given, the model is constrained to
+    return JSON matching it (OpenAI Structured Outputs, strict mode).
+
+    Returns the raw response object.
+    """
+    full_messages = [{"role": "system", "content": system}] + list(messages)
+
+    kwargs = {
+        "model": model or DEFAULT_MODEL,
+        "max_completion_tokens": max_tokens,
+        "messages": full_messages,
+    }
+    if schema is not None:
+        kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "strict": True,
+                "schema": schema,
+            },
+        }
+
+    return client.chat.completions.create(**kwargs)
+
+
+def _structured_call(user_content, schema, *, model=None, max_tokens=1500,
+                     schema_name="response"):
+    """Make a model call that returns JSON matching `schema`.
+
+    Returns the parsed dict on success. Raises on API/parse errors (or a model
+    refusal) so the public functions can convert them into a (False, message)
+    tuple.
+    """
+    import json
+
+    response = _model_call(
+        [{"role": "user", "content": user_content}],
+        system=KAKEIBO_SYSTEM,
+        model=model,
+        max_tokens=max_tokens,
+        schema=schema,
+        schema_name=schema_name,
+    )
+
+    message = response.choices[0].message
+    # Strict structured outputs can still come back as a safety refusal.
+    if getattr(message, "refusal", None):
+        raise RuntimeError(f"Model declined the request: {message.refusal}")
+
+    return json.loads(message.content)
+
+
+def _format_transactions(transactions):
+    """Turn a list of transaction dicts into a readable text block for the model."""
+    lines = []
+    for t in transactions:
+        lines.append(
+            f"- {t.get('date', '?')}: {t.get('item', 'unknown')} "
+            f"(${t.get('amount', 0)}) "
+            f"[category: {t.get('category', 'uncategorized')}, "
+            f"tag: {t.get('tag', 'none')}]"
+        )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 1. Purchase reflection — the "should I buy this?" moment.
+# ---------------------------------------------------------------------------
+def reflect_on_purchase(item, amount, category, user_note="", model=None):
+    """Walk the user through the four Kakeibo questions for one purchase they
+    are debating.
+
+    Pass `model` to use a specific model for this call; leave it None to use
+    DEFAULT_MODEL.
+
+    Returns (True, {
+        "questions":   [str, ...],          # the reflective questions, personalized
+        "reflection":  str,                 # a short reflective paragraph
+        "suggestion":  "wait" | "reconsider" | "go_ahead",
+        "gentle_note": str,                 # one encouraging closing line
+    }) on success, or (False, error_message) on failure.
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "questions": {"type": "array", "items": {"type": "string"}},
+            "reflection": {"type": "string"},
+            "suggestion": {"type": "string", "enum": ["wait", "reconsider", "go_ahead"]},
+            "gentle_note": {"type": "string"},
+        },
+        "required": ["questions", "reflection", "suggestion", "gentle_note"],
+        "additionalProperties": False,
+    }
+
+    note_line = f'\nThe user added a note: "{user_note}"' if user_note else ""
+    prompt = (
+        f"The user is thinking about buying this:\n"
+        f"  Item: {item}\n"
+        f"  Cost: ${amount}\n"
+        f"  Category: {category}{note_line}\n\n"
+        f"Help them reflect using the Kakeibo method. Personalize the four "
+        f"reflection questions to THIS purchase (don't just repeat them word for "
+        f"word). Give a short reflection, a gentle suggestion (wait / reconsider "
+        f"/ go_ahead), and one encouraging closing note. Do not shame them."
+    )
+
+    try:
+        data = _structured_call(
+            prompt, schema, model=model, max_tokens=1200,
+            schema_name="purchase_reflection",
+        )
+        return (True, data)
+    except Exception as e:
+        return (False, f"Could not generate purchase reflection: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 2. Monthly analysis — the Kakeibo monthly review.
+# ---------------------------------------------------------------------------
+def monthly_analysis(transactions, income=None, savings_goal=None, model=None):
+    """Produce a Kakeibo-style monthly review from the user's transactions.
+
+    `transactions` is a list of dicts shaped like:
+        {"date": "2026-06-12", "item": "Coffee", "amount": 5.50,
+         "category": "food", "tag": "want"}
+
+    Returns (True, {
+        "summary":              str,
+        "categories":           {"survival": str, "optional": str,
+                                 "culture": str, "unexpected": str},
+        "wins":                 [str, ...],
+        "leaks":                [str, ...],
+        "questions_next_month": [str, ...],
+        "encouragement":        str,
+    }) on success, or (False, error_message) on failure.
+
+    This is the one genuinely analytical call. It is low-frequency (about once a
+    month per user), so it is a good place to pass a stronger reasoning model
+    via `model=` if you want deeper analysis.
+    """
+    if not transactions:
+        return (False, "No transactions provided for monthly analysis.")
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string"},
+            "categories": {
+                "type": "object",
+                "properties": {
+                    "survival": {"type": "string"},
+                    "optional": {"type": "string"},
+                    "culture": {"type": "string"},
+                    "unexpected": {"type": "string"},
+                },
+                "required": ["survival", "optional", "culture", "unexpected"],
+                "additionalProperties": False,
+            },
+            "wins": {"type": "array", "items": {"type": "string"}},
+            "leaks": {"type": "array", "items": {"type": "string"}},
+            "questions_next_month": {"type": "array", "items": {"type": "string"}},
+            "encouragement": {"type": "string"},
+        },
+        "required": [
+            "summary", "categories", "wins", "leaks",
+            "questions_next_month", "encouragement",
+        ],
+        "additionalProperties": False,
+    }
+
+    context = ""
+    if income is not None:
+        context += f"Monthly income: ${income}\n"
+    if savings_goal is not None:
+        context += f"Savings goal: ${savings_goal}\n"
+
+    prompt = (
+        f"{context}\n"
+        f"Here are this month's transactions:\n"
+        f"{_format_transactions(transactions)}\n\n"
+        f"Give a Kakeibo-style monthly review. In 'categories', describe how the "
+        f"spending falls into the four Kakeibo buckets:\n"
+        f"  - survival   = needs (rent, food, bills, transport)\n"
+        f"  - optional   = wants (eating out, entertainment, treats)\n"
+        f"  - culture    = self-growth (books, courses, hobbies, experiences)\n"
+        f"  - unexpected = one-off / emergency / surprise costs\n\n"
+        f"Then list 'wins' (good habits to celebrate), 'leaks' (where money "
+        f"quietly drained away), reflective 'questions_next_month', and a warm "
+        f"'encouragement'. Be specific to the actual transactions. Stay kind."
+    )
+
+    try:
+        data = _structured_call(
+            prompt, schema, model=model, max_tokens=2500,
+            schema_name="monthly_review",
+        )
+        return (True, data)
+    except Exception as e:
+        return (False, f"Could not generate monthly analysis: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 3. Weekly probing questions.
+# ---------------------------------------------------------------------------
+def weekly_questions(user_profile, recent_activity=None, model=None):
+    """Generate 2-3 personalized reflection questions for the week.
+
+    `user_profile` is a dict (e.g. the output of summarize_profile) or any
+    small description of the user's goals/priorities.
+    `recent_activity` is optional — a short summary or list of recent spending.
+
+    Returns (True, {"questions": [str, ...]}) or (False, error_message).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "questions": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["questions"],
+        "additionalProperties": False,
+    }
+
+    activity_line = ""
+    if recent_activity:
+        activity_line = f"\nTheir recent activity:\n{recent_activity}\n"
+
+    prompt = (
+        f"Here is what we know about the user:\n{user_profile}{activity_line}\n\n"
+        f"Write 2-3 short, friendly probing questions to help them reflect on "
+        f"their spending priorities this week. Make the questions personal to "
+        f"their goals, not generic. Each question should be one sentence."
+    )
+
+    try:
+        data = _structured_call(
+            prompt, schema, model=model, max_tokens=600,
+            schema_name="weekly_questions",
+        )
+        return (True, data)
+    except Exception as e:
+        return (False, f"Could not generate weekly questions: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 4. Free-form coaching chat / advice assistant.
+# ---------------------------------------------------------------------------
+def ask_coach(history, user_context=None, model=None):
+    """Answer a free-form question from the user, as the Kakeibo coach.
+
+    The model API is stateless, so the Flask layer must pass the FULL
+    conversation each time.
+
+    `history` is a list of message dicts:
+        [{"role": "user", "content": "How do I start an emergency fund?"},
+         {"role": "assistant", "content": "..."},
+         {"role": "user", "content": "How much should be in it?"}]
+    The first message must be role "user".
+
+    `user_context` is optional — a short string with the user's profile/stats
+    so answers are personalized.
+
+    Returns (True, reply_text) or (False, error_message).
+
+    NOTE: This same function powers the onboarding "Initial Interview" — just
+    seed `history` with a first assistant/user exchange that kicks off the
+    interview.
+    """
+    if not history:
+        return (False, "No conversation history provided.")
+
+    system = KAKEIBO_SYSTEM
+    if user_context:
+        system = f"{KAKEIBO_SYSTEM}\n\nContext about this user:\n{user_context}"
+
+    try:
+        response = _model_call(
+            history,
+            system=system,
+            model=model,
+            max_tokens=1500,
+        )
+        message = response.choices[0].message
+        if getattr(message, "refusal", None):
+            return (False, f"Coach declined to answer: {message.refusal}")
+        return (True, message.content)
+    except Exception as e:
+        return (False, f"Could not generate coach reply: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 5. Turn the onboarding interview into a stored profile.
+# ---------------------------------------------------------------------------
+def summarize_profile(interview_transcript, model=None):
+    """Condense an onboarding-interview transcript into a structured profile.
+
+    `interview_transcript` is a string (or list of Q&A turns) from the initial
+    interview. The returned profile can be saved to Supabase by the Flask layer
+    and fed back into the other functions for personalization.
+
+    Returns (True, {
+        "goals":            [str, ...],
+        "priorities":       [str, ...],
+        "money_personality": str,
+        "focus_areas":      [str, ...],
+    }) or (False, error_message).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "goals": {"type": "array", "items": {"type": "string"}},
+            "priorities": {"type": "array", "items": {"type": "string"}},
+            "money_personality": {"type": "string"},
+            "focus_areas": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["goals", "priorities", "money_personality", "focus_areas"],
+        "additionalProperties": False,
+    }
+
+    # Accept either a plain string or a list of turns.
+    if isinstance(interview_transcript, list):
+        transcript_text = "\n".join(str(t) for t in interview_transcript)
+    else:
+        transcript_text = str(interview_transcript)
+
+    prompt = (
+        f"Here is the user's onboarding interview:\n{transcript_text}\n\n"
+        f"Summarize it into a compact profile we can store and reuse:\n"
+        f"  - goals: their financial goals\n"
+        f"  - priorities: what matters most to them about money\n"
+        f"  - money_personality: one short, kind sentence describing their "
+        f"relationship with money\n"
+        f"  - focus_areas: 2-4 areas where the app should gently help them most"
+    )
+
+    try:
+        data = _structured_call(
+            prompt, schema, model=model, max_tokens=900,
+            schema_name="user_profile",
+        )
+        return (True, data)
+    except Exception as e:
+        return (False, f"Could not summarize profile: {e}")
+
+
+'''
+AI Tasks:
+Call and Response(Suggestions)
+Timers for flags(trigger events)
+    Weekly Summary
+    Monthly Summary
+On Boarding Info - Give transcript
+
+'''
