@@ -158,3 +158,74 @@ a {
 a:hover {
     text-decoration: underline;
 }
+
+
+/* AI chatbot */
+.chatbot {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    max-width: 100%;
+    padding: 32px;
+    border-radius: 20px;
+    background-color: var(--card-color);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+.chatbot h2 {
+    margin-top: 0;
+}
+
+.chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 360px;
+    margin: 16px 0;
+    padding: 16px;
+    overflow-y: auto;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.chat-message {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* the user's own messages, aligned right in the brand color */
+.chat-message.user {
+    align-self: flex-end;
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* the coach's replies, aligned left */
+.chat-message.assistant {
+    align-self: flex-start;
+    background-color: var(--card-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.chat-form {
+    flex-direction: row;
+    gap: 8px;
+    margin: 0;
+}
+
+.chat-form input {
+    flex: 1;
+}
+
+.chat-form button {
+    margin-top: 0;
+    width: auto;
+    padding: 12px 20px;
+}

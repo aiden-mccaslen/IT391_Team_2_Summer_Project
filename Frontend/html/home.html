@@ -28,7 +28,21 @@
 
     <div id="chatbot" class="chatbot">
       <h2>AI finance Chatbot</h2>
-      <p>put ai chat here</p>
+      <p>Ask your Kakeibo coach anything about money and habits.</p>
+
+      <div id="chatMessages" class="chat-messages"></div>
+
+      <form id="chatForm" class="chat-form">
+        <input
+          type="text"
+          id="chatInput"
+          name="chatInput"
+          placeholder="Type your message..."
+          autocomplete="off"
+          required
+        >
+        <button type="submit">Send</button>
+      </form>
     </div>
   </main>
 
@@ -36,6 +50,8 @@
     <p>Meticulous Budgeting is an app using Kekeibo budgeting and 
         50/30/20 budgeting to help a young audience with their financial downfalls.</p>
   </footer>
+
+  <script src="../javascript/chat.js"></script>
 
 </body>
 </html>
