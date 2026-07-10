@@ -1,5 +1,7 @@
 const expenseForm = document.getElementById("expenseForm");
-const log = document.querySelector("#log");
+const fundForm = document.getElementById("fundForm");
+
+// const log = document.querySelector("#log");
 
 const API_BASE_URL = "http://localhost:5500";
 
@@ -47,12 +49,12 @@ if (expenseForm) {
         // testing
         console.log(expenseData);
 
-        sendLoginRequest(loginData);
+        //sendLoginRequest(loginData);
     });
 
 }
 
-async function sendExpenseRequest(loginData) {
+async function sendExpenseRequest(expenseData) {
     try {
         const response = await fetch(`${API_BASE_URL}/login`, {
             method: "POST",
@@ -60,6 +62,43 @@ async function sendExpenseRequest(loginData) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify(expenseData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            window.location.href = "../html/expenses.html";
+        }
+        else
+        {
+            alert(result.message);
+        }
+
+        console.log("Expense response:", result);
+    } catch (error) {
+        console.error("Expense request failed:", error);
+    }
+}
+
+if (fundForm) {
+    fundForm.addEventListener("submit", function(event) {
+        event.preventDefault();
+        const fundData = new FormData(fundForm);
+        const fund = fundData.get("amount");
+        console.log("fund: "+ fund);
+        sendFundRequest(fundData);
+    });
+
+}
+
+async function sendFundRequest(fundData) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(fundData)
         });
 
         const result = await response.json();

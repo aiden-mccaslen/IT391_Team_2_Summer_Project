@@ -18,15 +18,15 @@
 
     <div class="expenses_welcome">
         <h2>
-            Enter your expenses here!
+            Enter your expenses and funds here!
         </h2>
     </div>
 
     <main>
-
-        <form id="expenseForm">
+        <!-- I need to clear this form after it's submitted -->
+        <form id="expenseForm"> 
             <fieldset>
-                <legend>Type of Expense</legend>
+                <legend>Expense</legend>
                 <label for="amount">Amount ($)</label>      
                 <input
                     type="number"
@@ -44,7 +44,7 @@
                     name="date"
                     
                 /> <!-- Leaving this as not required since people might forget the date of a purchase -->
-                <br>
+                <div>Type of Expense:</div>
                 <input
                     type="radio"
                     name="expense"
@@ -128,7 +128,28 @@
                 <input type="submit"/>
             </fieldset>
         </form>
-        <pre id="log"></pre>
+
+        <form id="fundForm">
+            <fieldset>
+                <legend>Credit</legend>
+                <label for="amount">Amount ($)</label>      
+                <input
+                    type="number"
+                    id="amount"
+                    name="amount"
+                    placeholder="Enter the fund here"
+                    required
+                >
+                <br>
+
+
+
+                <br>
+                <input type="submit"/>
+            </fieldset>
+        </form>
+        
+        <!-- <pre id="log"></pre> -->
         <p>Getting started on tracking expenses</p>
     </main>
 
