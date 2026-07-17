@@ -149,6 +149,15 @@ def _format_transactions(transactions):
     return "\n".join(lines)
 
 
+def _format_messages(messages):
+    """Turn a list of chat messages into a readable transcript for the model."""
+    lines = []
+    for m in messages:
+        speaker = "Coach" if m.get("role") == "assistant" else "User"
+        lines.append(f"{speaker}: {m.get('content', '')}")
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # 1. Purchase reflection — the "should I buy this?" moment.
 # ---------------------------------------------------------------------------
@@ -426,6 +435,77 @@ def summarize_profile(interview_transcript, model=None):
         return (True, data)
     except Exception as e:
         return (False, f"Could not summarize profile: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 6. Roll a long chat up into a summary, so we stop resending the whole thing.
+# ---------------------------------------------------------------------------
+def summarize_conversation(messages, previous_summary=None, model=None):
+    """Condense the older turns of a coaching chat into a compact summary.
+
+    A long chat eventually costs too much to replay in full on every message, so
+    the Flask layer keeps only the most recent turns and hands the older ones to
+    this function. Pass the conversation's existing summary as `previous_summary`
+    and it gets folded into the new one, so the summary rolls forward as the chat
+    grows instead of starting over each time.
+
+    `messages` is a list of message dicts, oldest first:
+        [{"role": "user", "content": "I keep overspending on takeout."},
+         {"role": "assistant", "content": "..."}]
+
+    Returns (True, {
+        "summary":      str,        # short paragraph: what this chat has been about
+        "key_points":   [str, ...], # facts about the user worth remembering
+        "open_threads": [str, ...], # advice given, or questions still unanswered
+    }) or (False, error_message).
+
+    The stored summary is fed back to ask_coach as `user_context`, so write it for
+    the coach to read, not for the user.
+    """
+    if not messages:
+        return (False, "No messages provided to summarize.")
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "summary": {"type": "string"},
+            "key_points": {"type": "array", "items": {"type": "string"}},
+            "open_threads": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["summary", "key_points", "open_threads"],
+        "additionalProperties": False,
+    }
+
+    previous_block = ""
+    if previous_summary:
+        previous_block = (
+            f"Here is the summary of the conversation SO FAR:\n{previous_summary}\n\n"
+            f"Here are the newer turns it does not cover yet:\n"
+        )
+    else:
+        previous_block = "Here is the earlier part of a coaching conversation:\n"
+
+    prompt = (
+        f"{previous_block}"
+        f"{_format_messages(messages)}\n\n"
+        f"Fold all of that into ONE updated summary the coach can read before "
+        f"picking the conversation back up:\n"
+        f"  - summary: a short paragraph on what has been discussed\n"
+        f"  - key_points: concrete facts about the user (goals, habits, numbers, "
+        f"worries) worth remembering\n"
+        f"  - open_threads: advice already given, or questions left hanging\n\n"
+        f"Do not lose anything important from the earlier summary -- carry it "
+        f"forward. Keep it brief; this gets sent with every future message."
+    )
+
+    try:
+        data = _structured_call(
+            prompt, schema, model=model, max_tokens=900,
+            schema_name="conversation_summary",
+        )
+        return (True, data)
+    except Exception as e:
+        return (False, f"Could not summarize conversation: {e}")
 
 
 '''
