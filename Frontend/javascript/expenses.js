@@ -3,7 +3,7 @@ const fundForm = document.getElementById("fundForm");
 
 // const log = document.querySelector("#log");
 
-const API_BASE_URL = "http://localhost:5500";
+const API_BASE_URL = "http://localhost:5000";
 
 console.log(expenseForm)
 
@@ -49,7 +49,7 @@ if (expenseForm) {
         // testing
         console.log(expenseData);
 
-        //sendLoginRequest(loginData);
+        sendExpenseRequest(expenseData);
     });
 
 }

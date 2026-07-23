@@ -9,28 +9,44 @@
 }
 
 main {
-    inherits: all;
+    justify-content: center;
+    flex-direction: column;
+    display: flex;
     padding: 40px;
     min-height: 5vh;
-    display: inline-block;
-}
-
-.option_label {
-    /* margin-top: px;
-    display: grid; */
-    align-items: left;
-    /* font-weight: bold; */
 }
 
 .expenses_welcome {
-    min-height: 5vh;
     justify-content: center;
+    flex-direction: column;
+    display: flex;
     align-items: center;
-    padding-left: 40px;
-    padding-right: 40px;
+    padding: 40px;
+    min-height: 5vh;
+}
+fieldset {
+    border: 0;
 }
 
 form {
-    display: inline;
-    justify-content: left;
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    max-width: 100%;
+    padding: 32px;
+    border-radius: 20px;
+    background-color: var(--card-color);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+input[type=submit] {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: #6C63FF;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
 }

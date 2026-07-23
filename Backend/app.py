@@ -1,6 +1,6 @@
 # route logout back to signup (and add the "you have logged out popup")
 
-from  flask import request, Flask, jsonify, url_for, redirect
+from  flask import Flask, request, jsonify, url_for, redirect
 from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
@@ -70,4 +70,4 @@ def logout():
     user_file.logout()
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
