@@ -24,7 +24,7 @@ def signup(name, email, password):
         # Response contains: {'user': {'email': '...', ...}}
 
         if (response != None):
-            return (True, "No errors")
+            return (True, response.session.access_token)
         
         return (False, "Unknown error has occured")
     except AuthApiError as e:
@@ -38,7 +38,7 @@ def login(email, password):
         # Response contains: {'access_token': '...', 'refresh_token': '...', 'user': {...}}
 
         if (response != None):
-            return (True, "No error")
+            return (True, response.session.access_token)
         
         return (False, "Username or password incorrect")
     except AuthApiError as e:

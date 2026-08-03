@@ -94,6 +94,7 @@ async function sendLoginRequest(loginData) {
         const result = await response.json();
 
         if (result.success) {
+            localStorage.setItem("access_token", result.access_token);
             window.location.href = "../html/home.html";
         }
         else
@@ -114,7 +115,8 @@ async function sendSignupRequest(signupData) {
         const response = await fetch(`${API_BASE_URL}/signup`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
             },
             body: JSON.stringify(signupData)
         });

@@ -1,20 +1,31 @@
+console.log("before expense form")
 const expenseForm = document.getElementById("expenseForm");
+console.log("before fundform")
 const fundForm = document.getElementById("fundForm");
+
+// console.log("before dumbshit")
+// document.querySelector('form').onsubmit = e => {
+//    e.target.submit();
+//    e.target.reset();
+//    return false;
+// };
 
 // const log = document.querySelector("#log");
 
 const API_BASE_URL = "http://localhost:5000";
-
+console.log("Before first log")
 console.log(expenseForm)
-
+console.log("if")
 if (expenseForm) {
+    console.log("in if")
     expenseForm.addEventListener("submit", function(event) {
         event.preventDefault();
+
         const data = new FormData(expenseForm);
         console.log("data: "+data);
         let amount;
-        let date;
-        let expenseType = "";
+        let purchase_date;
+        let category = "";
         for(const entry of data){
             console.log("entry: "+entry)
 
@@ -25,47 +36,50 @@ if (expenseForm) {
             }
 
             if(entry[0] == "date"){
-                date = entry[1];
-                console.log(date)
+                purchase_date = entry[1];
+                console.log(purchase_date)
             }
 
-            if(entry[0] == "expense"){
-                expenseType = entry[1];
-                console.log(expenseType)
+            if(entry[0] == "category"){
+                category = entry[1];
+                console.log(category)
             }
 
             
         }
         // testing
         console.log(amount); 
-        console.log(date);
-        console.log(expenseType);
+        console.log(purchase_date);
+        console.log(category);
         //backend package
         const expenseData = {
             amount: amount,
-            date: date,
-            expenseType: expenseType
+            purchase_date: purchase_date,
+            category: category
         };
         // testing
-        console.log(expenseData);
-
+        console.log("Expense Data: ", expenseData);
+        console.log("before call")
         sendExpenseRequest(expenseData);
     });
-
+    console.log("after event listener")
 }
 
 async function sendExpenseRequest(expenseData) {
+    console.log("try")
     try {
-        const response = await fetch(`${API_BASE_URL}/login`, {
+        console.log("top of try")
+        const response = await fetch(`${API_BASE_URL}/expenses`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
             },
             body: JSON.stringify(expenseData)
         });
-
+        console.log("after fetch")
         const result = await response.json();
-
+        console.log("after away")
         if (result.success) {
             window.location.href = "../html/expenses.html";
         }
@@ -79,28 +93,55 @@ async function sendExpenseRequest(expenseData) {
         console.error("Expense request failed:", error);
     }
 }
+console.log("before fund if")
 
 if (fundForm) {
     fundForm.addEventListener("submit", function(event) {
         event.preventDefault();
         const fundData = new FormData(fundForm);
+        // let amount;
+        // let purchase_date;
+        // let category = "";
+        // for(const entry of data){
+        //     console.log("entry: "+entry)
+
+        //     if(entry[0] == "amount"){
+        //         amount = entry[1];
+        //         // const amount = amountInput.value;
+        //         console.log(amount)
+        //     }
+
+        //     if(entry[0] == "account"){
+        //         account = entry[1];
+        //         console.log(category)
+        //     }
+
+            
+        // }
         const fund = fundData.get("amount");
+        const account = fundData.get("account")
         console.log("fund: "+ fund);
-        sendFundRequest(fundData);
+        console.log("account: "+ account);
+        
+        sendFundRequest({amount: fund, account: account});
     });
 
 }
 
+console.log("after fund if")
 async function sendFundRequest(fundData) {
+    console.log("before try");
     try {
-        const response = await fetch(`${API_BASE_URL}/login`, {
+        console.log("start-try");
+        const response = await fetch(`${API_BASE_URL}/expenses`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
             },
             body: JSON.stringify(fundData)
         });
-
+        console.log("bulls");
         const result = await response.json();
 
         if (result.success) {
