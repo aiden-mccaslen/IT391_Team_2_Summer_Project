@@ -5,7 +5,9 @@ from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
 import expenses
-
+import budget
+import fee_monitor
+import purchase_rules
 
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app) # change this to restrict endpoints later
@@ -96,6 +98,106 @@ def expense():
         "success": status[0],
         "message": status[1]
     })
+
+@app.route("/budget", methods=["GET"])
+def get_budget():
+
+    access_token = request.headers.get(
+        "Authorization", ""
+    ).removeprefix("Bearer ").strip()
+
+    success, expenses_data = expenses.get_expenses(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": expenses_data
+        })
+
+    success, funds_data = expenses.get_funds(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": funds_data
+        })
+
+    income = 0
+
+    if len(funds_data) > 0:
+        income = float(funds_data[0]["amount"])
+
+    summary = budget.calculate_budget(income, expenses_data)
+    warnings = budget.evaluate_budget(summary)
+
+    return jsonify({
+        "success": True,
+        "budget": summary,
+        "warnings": warnings
+    })
+
+
+@app.route("/fees", methods=["GET"])
+def get_fee_warnings():
+
+    access_token = request.headers.get(
+        "Authorization", ""
+    ).removeprefix("Bearer ").strip()
+
+    success, fees = fee_monitor.get_fees(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": fees
+        })
+
+    warnings = fee_monitor.check_fee_warnings(fees)
+
+    return jsonify({
+        "success": True,
+        "warnings": warnings
+    })
+
+@app.route("/purchase-rules", methods=["POST"])
+def evaluate_purchase():
+
+    data = request.get_json()
+
+    access_token = request.headers.get(
+        "Authorization", ""
+    ).removeprefix("Bearer ").strip()
+
+    success, expenses_data = expenses.get_expenses(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": expenses_data
+        })
+
+    success, funds_data = expenses.get_funds(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": funds_data
+        })
+
+    income = float(funds_data[0]["amount"])
+
+    result = purchase_rules.evaluate_purchase(
+    income,
+    expenses_data,
+    float(data["amount"]),
+    data["category"]
+    )
+
+    return jsonify({
+    "success": True,
+    "result": result
+    })
+
 
 if __name__ == "__main__":
     app.run(debug=True) #, port=5500)

@@ -7,7 +7,10 @@ load_dotenv()
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase_client: Client = create_client(url, key)
-
+'''
+Made account non-nullable in database
+made user_id unique so it has to be updated to reflect current balance
+'''
 def report_expense(access_token, amount, purchase_date, category):
     print("report_expense called")
     try: # This is where I need to save to the database
@@ -26,27 +29,60 @@ def report_expense(access_token, amount, purchase_date, category):
                 }
             ]).execute()
         )
-        return (True, "Expense saved to table")
+        return (True, response.data)
 
     except Exception as e:
         return (False, str(e))
 
-def report_fund(access_token, amount, account):
-    try: # This is where I need to save to the database
-        print("Before-ID")
+def get_expenses(access_token): #gets expenses form supabase
+    try:
         user_response = supabase_client.auth.get_user(access_token)
         uuid = user_response.user.id
-        print("After-ID")
+
+        response = (
+            supabase_client.table("expenses")
+            .select("*")
+            .eq("user_id", uuid)
+            .execute()
+        )
+
+        return (True, response.data)
+
+    except Exception as e:
+        return (False, str(e))
+    
+def report_fund(access_token, amount, account): # can't have checking and saving (need to talk about this)
+    try:
+        user_response = supabase_client.auth.get_user(access_token)
+        uuid = user_response.user.id
+
         response = (
             supabase_client.table("funds")
-            .insert([{
+            .upsert({
                 "user_id": uuid,
                 "amount": amount,
-                "account": account 
-                }
-            ]).execute()
+                "account": account
+            }, on_conflict="user_id")
+            .execute()
         )
-        return (True, "Expense saved to table")
+        return (True, response.data)
+
+    except Exception as e:
+        return (False, str(e))
+
+def get_balance(access_token): # gets income form supabase
+    try:
+        user_response = supabase_client.auth.get_user(access_token)
+        uuid = user_response.user.id
+
+        response = (
+            supabase_client.table("funds")
+            .select("*")
+            .eq("user_id", uuid)
+            .execute()
+        )
+
+        return (True, response.data)
 
     except Exception as e:
         return (False, str(e))
