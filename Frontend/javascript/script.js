@@ -1,138 +1,112 @@
-//storing forms from HTML
+/* Login and signup.
+ *
+ * Handles the forms on login.html, signup.html and the landing page. Needs
+ * api.js loaded first -- that is where the backend calls and token storage live.
+ *
+ * The important part: /login hands back an access_token, and every chat and
+ * history endpoint requires it as "Authorization: Bearer <token>". If it is not
+ * saved here, the coach can never authenticate. auth.save() puts it in
+ * sessionStorage for the rest of the session.
+ */
+
 const loginForm = document.getElementById("loginForm");
 const signupForm = document.getElementById("signupForm");
+const formMessage = document.getElementById("formMessage");
 
-//checks
-console.log("loaded");
-console.log(loginForm);
-console.log(signupForm);
-
-//backend URL
-const API_BASE_URL = "http://localhost:5000"; // changed to match flask deafult api
-
-//events
-if (loginForm) {
-    loginForm.addEventListener("submit", function(event) {
-        event.preventDefault();
-
-        const emailInput = document.getElementById("email");
-        const email = emailInput.value;
-
-        const passwordInput = document.getElementById("password");
-        const password = passwordInput.value;
-        
-        //check
-        console.log(email); 
-        console.log(password);
-        
-        //backend package
-        const loginData = {
-            email: email,
-            password: password
-        };
-
-        //check
-        console.log(loginData);
-
-        sendLoginRequest(loginData);
-    });
-
+if (typeof api === "undefined") {
+    console.error("script.js needs api.js -- add <script src=\"../javascript/api.js\"></script> before it.");
 }
-//forms
-if (signupForm) {
-    signupForm.addEventListener("submit", function(event) {
+
+/* Feedback. Uses the inline message element where the page has one, and falls
+   back to alert() on the older pages that do not. */
+function showMessage(text, kind) {
+    if (!formMessage) {
+        alert(text);
+        return;
+    }
+    formMessage.textContent = text;
+    formMessage.className = `form-message is-${kind}`;
+}
+
+function clearMessage() {
+    if (formMessage) {
+        formMessage.textContent = "";
+        formMessage.className = "form-message";
+    }
+}
+
+function setBusy(form, busy, label) {
+    const button = form.querySelector("button[type=submit]");
+    if (!button) {
+        return;
+    }
+    button.disabled = busy;
+    if (busy) {
+        button.dataset.idleLabel = button.textContent;
+        button.textContent = label;
+    } else if (button.dataset.idleLabel) {
+        button.textContent = button.dataset.idleLabel;
+    }
+}
+
+/* Login ------------------------------------------------------------------ */
+if (loginForm) {
+    loginForm.addEventListener("submit", async function (event) {
         event.preventDefault();
+        clearMessage();
 
-        const nameInput = document.getElementById("fullName");
-        const name = nameInput.value;
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
 
-        const emailInput = document.getElementById("email");
-        const email = emailInput.value;
+        setBusy(loginForm, true, "Logging in…");
+        const result = await api.login(email, password);
+        setBusy(loginForm, false);
 
-        const passwordInput = document.getElementById("password");
-        const password = passwordInput.value;
-        
-         const passwordConfirmationInput = document.getElementById("passwordConfirmation");
-         const passwordConfirmation = passwordConfirmationInput.value;
-
-        //validation
-        if (password !== passwordConfirmation) {
-            alert("Passwords do not match.");
+        if (!result.success) {
+            showMessage(result.message, "error");
             return;
         }
 
-        //check
-        console.log(name);
-        console.log(email); 
-        console.log(password);
-
-        //backend package
-        const signupData = {
-            name: name,
-            email: email,
-            password: password
-        };
-        
-        //check
-        console.log(signupData);
-        
-        sendSignupRequest(signupData);
+        // Without this the session is anonymous and /chat returns 401.
+        auth.save(result);
+        window.location.href = "dashboard.html";
     });
 }
 
-//login request to backend
-async function sendLoginRequest(loginData) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/login`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(loginData)
-        });
+/* Signup ----------------------------------------------------------------- */
+if (signupForm) {
+    signupForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        clearMessage();
 
-        const result = await response.json();
+        const name = document.getElementById("fullName").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = document.getElementById("password").value;
+        const confirmationField = document.getElementById("passwordConfirmation");
 
-        if (result.success) {
-            window.location.href = "../html/home.html";
-        }
-        else
-        {
-            alert(result.message);
+        if (confirmationField && password !== confirmationField.value) {
+            showMessage("Those passwords do not match. Give it another try.", "error");
+            return;
         }
 
-        console.log("Login response:", result);
-    } catch (error) {
-        console.error("Login request failed:", error);
-    }
-}
-
-
-//signup request to backend
-async function sendSignupRequest(signupData) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/signup`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(signupData)
-        });
-
-        const result = await response.json();
-
-        // redirects to login page on success and gives error message on fail
-
-        if (result.success) {
-            window.location.href = "../html/login.html";
-        }
-        else
-        {
-            alert(result.message);
+        if (password.length < 8) {
+            showMessage("Passwords need to be at least 8 characters.", "error");
+            return;
         }
 
-        console.log("Signup response:", result);
-    } catch (error) {
-        console.error("Signup request failed:", error);
-    }
+        setBusy(signupForm, true, "Creating your account…");
+        const result = await api.signup(name, email, password);
+        setBusy(signupForm, false);
+
+        if (!result.success) {
+            showMessage(result.message, "error");
+            return;
+        }
+
+        // Signup does not return tokens -- the user logs in as a separate step.
+        showMessage("Account created. Taking you to the login page…", "success");
+        setTimeout(function () {
+            window.location.href = "login.html";
+        }, 1200);
+    });
 }
