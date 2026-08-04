@@ -1,12 +1,13 @@
 # route logout back to signup (and add the "you have logged out popup")
 
-from  flask import request, Flask, jsonify, url_for, redirect
+from  flask import Flask, request, jsonify, url_for, redirect
 from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
+import expenses
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app) # change this to restrict endpoints later
 
 '''
@@ -29,16 +30,21 @@ def signup(): # can only have 1 function per flask route
 '''
 
 @app.route("/")
-def home():
-    return login.html
+def home(): # This needs to be fixed maybe? If we run the app then run the liveserver, it errors.
+    return redirect("/html/home.html")
 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json() # turn what javascript sends to python dictionary
     status = user_file.login(data["email"], data["password"]) 
-    # status returns a tuple (true or false depending on suscessful login, error message)
-    return jsonify ({
-        "success": status[0],
+    # status returns a tuple (true or false, and either an access_token on success or an error message on failure)
+    if status[0]:
+        return jsonify({
+            "success": True,
+            "access_token": status[1]
+        })
+    return jsonify({
+        "success": False,
         "message": status[1]
     })
 
@@ -69,5 +75,27 @@ def chat():
 def logout():
     user_file.logout()
 
+@app.route("/expenses", methods=["POST"])
+def expense():
+    print("expense routed")
+    data = request.get_json() 
+    access_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+
+    if(len(data) > 2):
+        amount = data["amount"]
+        purchase_date = data["purchase_date"]
+        category = data["category"]
+        print(access_token)
+        status = expenses.report_expense(access_token, amount, purchase_date, category)
+    else:
+        amount = data["amount"]
+        account = data["account"]
+        status = expenses.report_fund(access_token, amount, account)
+
+    return jsonify ({
+        "success": status[0],
+        "message": status[1]
+    })
+
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True) #, port=5500)

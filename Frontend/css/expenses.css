@@ -1,0 +1,52 @@
+/* Colors */
+:root {
+    /* 
+    Note to self:
+    --colorName: #FFFFFF; 
+    somethingColor: var(--colorName);
+    */
+    --temp: #FFFFFF;
+}
+
+main {
+    justify-content: center;
+    flex-direction: column;
+    display: flex;
+    padding: 40px;
+    min-height: 5vh;
+}
+
+.expenses_welcome {
+    justify-content: center;
+    flex-direction: column;
+    display: flex;
+    align-items: center;
+    padding: 40px;
+    min-height: 5vh;
+}
+fieldset {
+    border: 0;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    max-width: 100%;
+    padding: 32px;
+    border-radius: 20px;
+    background-color: var(--card-color);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+input[type=submit] {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: #6C63FF;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
