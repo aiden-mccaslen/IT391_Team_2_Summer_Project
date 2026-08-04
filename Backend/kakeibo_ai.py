@@ -18,14 +18,29 @@ So the Flask layer (built by a teammate) stays thin:
 Provider: OpenAI (ChatGPT models). Default model: gpt-4o.
 """
 
+import logging
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import (OpenAI, RateLimitError, APITimeoutError,
+                    APIConnectionError, AuthenticationError)
 
 load_dotenv()
 
+# The real exceptions go to the log file (see app.py for where it lives); the
+# strings returned to callers are safe to show in the UI.
+log = logging.getLogger("kakeibo.ai")
+
 # Reads OPENAI_API_KEY from the environment (.env). Same pattern as user.py.
-client = OpenAI()
+# timeout: a hung request must not hold a Flask worker forever.
+# max_retries: the SDK quietly absorbs transient network blips before we ever
+# see them (failed requests are not billed).
+#
+# The "missing-key" fallback keeps the app BOOTING when the key is absent --
+# OpenAI() raises at import time otherwise, which would take login/signup down
+# with it. Calls then fail with AuthenticationError, which the user sees as
+# "the coach is unavailable" while the rest of the app keeps working.
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "missing-key",
+                timeout=30.0, max_retries=2)
 
 # Default model. Override globally by setting KAKEIBO_MODEL in .env, or
 # per-call by passing model="..." to any function below.
@@ -70,6 +85,66 @@ The Kakeibo method centers on four reflection questions for any purchase:
 
 The goal is always to help the user understand their own habits and make a
 choice they feel good about — not to simply tell them "no"."""
+
+
+# ---------------------------------------------------------------------------
+# Error handling.
+#
+# The raw exception text from the API can leak model names, request ids, and
+# quota details, so it never leaves the server: it goes to the log, and the
+# caller gets one of these messages instead. The frontend can show them as-is.
+# ---------------------------------------------------------------------------
+AI_BUSY = "The coach is busy right now. Give it a few seconds and try again."
+AI_UNREACHABLE = "Could not reach the coach. Please try again in a moment."
+AI_DOWN = "The coach is unavailable right now."
+AI_DECLINED = "The coach could not answer that one. Try rewording it."
+AI_FAILED = "An issue has occurred. Please try again."
+
+
+def is_configured():
+    """Whether the AI layer has an API key at all. Used by the /health endpoint
+    so the frontend can grey out the chat section when the coach is down."""
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+def _friendly_error(where, exc):
+    """Log the real exception, return a message safe to show the user.
+
+    Only call this from inside an `except` block (log.exception grabs the
+    active traceback).
+    """
+    log.exception("%s failed", where)
+    if isinstance(exc, RateLimitError):
+        return AI_BUSY
+    if isinstance(exc, (APITimeoutError, APIConnectionError)):
+        return AI_UNREACHABLE
+    if isinstance(exc, AuthenticationError):
+        # Bad/missing OPENAI_API_KEY -- a config problem, not the user's fault.
+        return AI_DOWN
+    return AI_FAILED
+
+
+def _was_billed(exc):
+    """Whether a failed call is likely to have cost money -- i.e. whether a
+    request actually reached the model and ran.
+
+    ask_coach reports this so the Flask layer can hand the user's rate-limit
+    slot back for failures that were definitely free. When in doubt this says
+    True: over-counting costs the user one message, under-counting is what lets
+    a retry loop run up a bill.
+    """
+    # Checked first: APITimeoutError subclasses APIConnectionError, and it is the
+    # dangerous one -- the request may well have completed server-side after we
+    # stopped waiting for it.
+    if isinstance(exc, APITimeoutError):
+        return True
+
+    if isinstance(exc, (RateLimitError, AuthenticationError, APIConnectionError)):
+        # Rejected before running (the SDK's own retries are already exhausted
+        # by this point), or never connected at all.
+        return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -206,7 +281,7 @@ def reflect_on_purchase(item, amount, category, user_note="", model=None):
         )
         return (True, data)
     except Exception as e:
-        return (False, f"Could not generate purchase reflection: {e}")
+        return (False, _friendly_error("reflect_on_purchase", e))
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +366,7 @@ def monthly_analysis(transactions, income=None, savings_goal=None, model=None):
         )
         return (True, data)
     except Exception as e:
-        return (False, f"Could not generate monthly analysis: {e}")
+        return (False, _friendly_error("monthly_analysis", e))
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +408,7 @@ def weekly_questions(user_profile, recent_activity=None, model=None):
         )
         return (True, data)
     except Exception as e:
-        return (False, f"Could not generate weekly questions: {e}")
+        return (False, _friendly_error("weekly_questions", e))
 
 
 # ---------------------------------------------------------------------------
@@ -354,32 +429,53 @@ def ask_coach(history, user_context=None, model=None):
     `user_context` is optional — a short string with the user's profile/stats
     so answers are personalized.
 
-    Returns (True, reply_text) or (False, error_message).
+    Returns a THREE-part tuple, unlike the rest of this module:
+        (True, reply_text, billed) or (False, error_message, billed)
+    `billed` says whether a request actually reached the model and cost money.
+    This is the only function wired to the Flask layer's spend limits, which
+    use the flag to refund the user's slot when a failure was free. See
+    _was_billed().
 
     NOTE: This same function powers the onboarding "Initial Interview" — just
     seed `history` with a first assistant/user exchange that kicks off the
     interview.
     """
     if not history:
-        return (False, "No conversation history provided.")
+        return (False, "No conversation history provided.", False)
 
     system = KAKEIBO_SYSTEM
     if user_context:
         system = f"{KAKEIBO_SYSTEM}\n\nContext about this user:\n{user_context}"
 
     try:
+        # 500 tokens is plenty for a coach that speaks in short sentences, and
+        # output tokens cost 4x input -- this caps the worst-case spend per reply.
         response = _model_call(
             history,
             system=system,
             model=model,
-            max_tokens=1500,
+            max_tokens=500,
         )
-        message = response.choices[0].message
+        choice = response.choices[0]
+        message = choice.message
+
+        # Everything below this point is a completed, billed request.
         if getattr(message, "refusal", None):
-            return (False, f"Coach declined to answer: {message.refusal}")
-        return (True, message.content)
+            # The refusal text is the model's own words -- log it, don't ship it.
+            log.warning("ask_coach refused: %s", message.refusal)
+            return (False, AI_DECLINED, True)
+
+        if choice.finish_reason == "length" or not message.content:
+            # Cut off at the token cap. A reply that stops mid-sentence must not
+            # be stored: it would be replayed as history on every one of the next
+            # RECENT_MESSAGE_LIMIT turns, teaching the coach to trail off too.
+            log.warning("ask_coach reply unusable (finish_reason=%s, chars=%d)",
+                        choice.finish_reason, len(message.content or ""))
+            return (False, AI_FAILED, True)
+
+        return (True, message.content, True)
     except Exception as e:
-        return (False, f"Could not generate coach reply: {e}")
+        return (False, _friendly_error("ask_coach", e), _was_billed(e))
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +530,7 @@ def summarize_profile(interview_transcript, model=None):
         )
         return (True, data)
     except Exception as e:
-        return (False, f"Could not summarize profile: {e}")
+        return (False, _friendly_error("summarize_profile", e))
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +601,7 @@ def summarize_conversation(messages, previous_summary=None, model=None):
         )
         return (True, data)
     except Exception as e:
-        return (False, f"Could not summarize conversation: {e}")
+        return (False, _friendly_error("summarize_conversation", e))
 
 
 '''

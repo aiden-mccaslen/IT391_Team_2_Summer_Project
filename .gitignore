@@ -1,4 +1,5 @@
 notes.txt
+Backend/logs/
 /myVenv
 .env
 supabase_operations.txt

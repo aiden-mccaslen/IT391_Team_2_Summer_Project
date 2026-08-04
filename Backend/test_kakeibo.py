@@ -80,7 +80,10 @@ def main():
     history = [
         {"role": "user", "content": "I keep overspending on takeout. How do I stop?"},
     ]
-    ok, payload = kakeibo_ai.ask_coach(history, user_context=str(SAMPLE_PROFILE))
+    # ask_coach is the one function returning three parts -- the third says
+    # whether the attempt was billed, which only the Flask spend guard uses.
+    ok, payload, _billed = kakeibo_ai.ask_coach(
+        history, user_context=str(SAMPLE_PROFILE))
     show("4. ask_coach", ok, payload)
 
     # 5. Profile summary from an onboarding interview

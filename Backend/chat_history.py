@@ -146,6 +146,34 @@ def add_message(db, conversation_id, role, content):
         return (False, f"Could not save the message: {e}")
 
 
+def delete_message(db, message_id):
+    """Remove one message. Used when the coach fails to reply: we delete the
+    user message we just stored, so the frontend's retry button can re-send the
+    same text without creating a duplicate.
+
+    Returns (True, None) or (False, error_message).
+    """
+    try:
+        db.table("messages").delete().eq("id", message_id).execute()
+        return (True, None)
+    except Exception as e:
+        return (False, f"Could not delete the message: {e}")
+
+
+def delete_conversation(db, conversation_id):
+    """Remove a conversation (its messages cascade in Postgres). Used when the
+    coach fails on the very FIRST message of a new chat -- otherwise an empty,
+    titled conversation would be left in the sidebar.
+
+    Returns (True, None) or (False, error_message).
+    """
+    try:
+        db.table("conversations").delete().eq("id", conversation_id).execute()
+        return (True, None)
+    except Exception as e:
+        return (False, f"Could not delete the conversation: {e}")
+
+
 def get_recent_messages(db, conversation_id, limit=RECENT_MESSAGE_LIMIT):
     """Fetch the last `limit` messages, oldest first -- the window we send to the model.
 
