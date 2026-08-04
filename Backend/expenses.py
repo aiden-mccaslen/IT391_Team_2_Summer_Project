@@ -36,10 +36,9 @@ def report_fund(access_token, amount, account):
         print("Before-ID")
         user_response = supabase_client.auth.get_user(access_token)
         uuid = user_response.user.id
-        #uuid = user.
         print("After-ID")
         response = (
-            supabase_client.table("expenses")
+            supabase_client.table("funds")
             .insert([{
                 "user_id": uuid,
                 "amount": amount,

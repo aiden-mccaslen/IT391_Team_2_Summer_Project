@@ -81,7 +81,7 @@ def expense():
     data = request.get_json() 
     access_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
 
-    if(len(data > 1)):
+    if(len(data) > 2):
         amount = data["amount"]
         purchase_date = data["purchase_date"]
         category = data["category"]
@@ -89,7 +89,8 @@ def expense():
         status = expenses.report_expense(access_token, amount, purchase_date, category)
     else:
         amount = data["amount"]
-        status = expenses.report_expense(access_token, amount)
+        account = data["account"]
+        status = expenses.report_fund(access_token, amount, account)
 
     return jsonify ({
         "success": status[0],
@@ -97,4 +98,4 @@ def expense():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5500)
+    app.run(debug=True) #, port=5500)
