@@ -12,8 +12,8 @@ main {
     justify-content: center;
     flex-direction: column;
     display: flex;
-    padding: 40px;
-    min-height: 5vh;
+    padding: 4px;
+    max-height: 5vh;
 }
 
 .expenses_welcome {

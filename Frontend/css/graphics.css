@@ -1,0 +1,34 @@
+/* Colors */
+:root {
+    /* 
+    Note to self:
+    --colorName: #FFFFFF; 
+    somethingColor: var(--colorName);
+    */
+    --temp: #FFFFFF;
+}
+
+.graphics_welcome {
+    justify-content: center;
+    flex-direction: column;
+    display: flex;
+    align-items: center;
+    padding: 5v;
+    min-height: 5vh;
+}
+
+.chart {
+    max-width: 20vh;
+    height: 10vh;
+    padding: 50px;
+    margin: 0 auto;
+}
+
+.chart .chart_types {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.chart .chart_types button {
+    padding: 10px 25px;
+}

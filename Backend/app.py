@@ -8,6 +8,7 @@ import expenses
 import budget
 import fee_monitor
 import purchase_rules
+import graphics
 
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app) # change this to restrict endpoints later
@@ -198,6 +199,23 @@ def evaluate_purchase():
     "result": result
     })
 
+
+@app.route("/graphics", methods=["GET"])
+def expenseGraph():
+    # Get the graph DATA here. We will plot in expenses.js, just return the data JSONified.
+    access_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    status = graphics.getGraphData(access_token)
+
+    if status[0]:
+        print("good")
+        return jsonify({
+            "success": True,
+            "data": status[1]
+        })
+    return jsonify({
+        "success": False,
+        "message": status[1]
+    })
 
 if __name__ == "__main__":
     app.run(debug=True) #, port=5500)
