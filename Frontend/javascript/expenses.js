@@ -73,7 +73,7 @@ async function sendExpenseRequest(expenseData) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+                "Authorization": `Bearer ${sessionStorage.getItem("mb_access_token")}`
             },
             body: JSON.stringify(expenseData)
         });
@@ -137,7 +137,7 @@ async function sendFundRequest(fundData) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${localStorage.getItem("access_token")}`
+                "Authorization": `Bearer ${sessionStorage.getItem("mb_access_token")}`
             },
             body: JSON.stringify(fundData)
         });

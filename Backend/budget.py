@@ -40,7 +40,7 @@ def calculate_totals(expenses):
     return totals
 
 # expenses is the result from expenses.py's get_expenses function
-# income is the result from expenses.py's get_balance function
+# income is the result from expenses.py's get_funds function
 def calculate_budget(income, expenses):
     """
     Calculates spending totals and percentages for the 50/30/20 rule.
@@ -88,4 +88,3 @@ def evaluate_budget(summary):
         )
 
     return warnings
-}
