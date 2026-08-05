@@ -533,7 +533,7 @@ def evaluate_purchase():
             "message": funds_data
         })
 
-    checking, _ = _split_funds(funds_data)
+    checking, _ = expenses._split_funds(funds_data)
     income = checking
 
     result = purchase_rules.evaluate_purchase(
@@ -567,4 +567,4 @@ def expenseGraph():
     })
 
 if __name__ == "__main__":
-    app.run(debug=True) #, port=5500)
+    app.run(debug=True)
