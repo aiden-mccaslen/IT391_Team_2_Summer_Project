@@ -148,6 +148,29 @@ a:hover { text-decoration: underline; }
    Bare <main> keeps centring the auth cards, so login.html / signup.html /
    home.html render unchanged. New pages opt out with <main class="page">.
    ========================================================================== */
+/* Bare <header> is what home.html and expenses.html use. Pages on the new
+   design system use .site-header / .app-header instead. */
+header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    margin: 0;
+    padding: 12px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+}
+
+header nav {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+header h1 { margin: 0; font-size: 20px; }
+
 main {
     min-height: 100vh;
     display: flex;
@@ -764,6 +787,16 @@ textarea:focus {
     margin-left: auto;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
+}
+
+/* Budget nudges. Amber, never red -- these are guidance, not failures. */
+.budget-warnings {
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    border-radius: var(--r-md);
+    background: var(--gold-200);
+    color: var(--notice);
+    font-size: 14px;
 }
 
 .cues h4 { margin: 0 0 10px; font-size: 14px; }

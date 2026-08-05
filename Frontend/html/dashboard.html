@@ -9,15 +9,15 @@
 </head>
 
 <!--
-  The figures on this page are placeholders until the expense/savings endpoints
-  exist. Everything carries a data-* hook or an id so dashboard.js can swap in
-  real numbers without the markup changing. The chatbot dock is live now.
+  Every figure here comes from GET /budget via dashboard.js -- the markup ships
+  em-dashes and zero-height bars, and the real numbers land once the request
+  returns. Nothing on this page is invented.
 -->
 <body class="dashboard">
 
   <header class="app-header">
     <div class="wrap">
-      <a class="brand" href="index.html">
+      <a class="brand" href="home.html">
         <span class="brand-mark" aria-hidden="true">&#165;</span>
         <span>Meticulous Budgeting</span>
       </a>
@@ -53,8 +53,14 @@
 
       <div class="dash-greeting">
         <h1 id="greeting">Welcome back</h1>
-        <p>Here is where your money went this month &mdash; and what it might be telling you.</p>
+        <p>
+          A look at <span id="monthName">this month</span>
+          &mdash; and what it might be telling you.
+        </p>
       </div>
+
+      <!-- Populated from /budget when it returns warnings (over 50/30, under 20). -->
+      <p class="budget-warnings" id="budgetWarnings" hidden></p>
 
       <!-- Three quick-glance cards ------------------------------------------ -->
       <section class="dash-top" aria-label="This month at a glance">
@@ -78,28 +84,22 @@
           </form>
         </article>
 
-        <!-- Spending trend. One series, so no legend: the title names it. -->
+        <!-- Spend to date. There is no historical series behind /budget yet, so
+             this states the real total rather than drawing an invented trend. -->
         <article class="card">
           <div class="card-title">
-            <h3>Spending trend</h3>
-            <span class="stat-value" id="spendTotal">$1,245</span>
+            <h3>Spent this month</h3>
           </div>
 
-          <figure class="chart" style="margin:0">
-            <svg class="sparkline" viewBox="0 0 260 92" preserveAspectRatio="none"
-                 role="img" aria-labelledby="trendDesc">
-              <title id="trendDesc">Monthly spending from January to May, rising from $780 to $1,245</title>
-              <path class="area" d="M8,74 L68,62 L128,68 L188,38 L248,20 L248,88 L8,88 Z"></path>
-              <polyline class="line" points="8,74 68,62 128,68 188,38 248,20"></polyline>
-              <circle class="dot" cx="248" cy="20" r="4"></circle>
-            </svg>
+          <p class="stat-value" id="dashboardTotal">&mdash;</p>
+          <p class="stat-label">Across needs, wants and savings</p>
 
-            <div class="axis-labels" aria-hidden="true">
-              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
-            </div>
-          </figure>
+          <p class="stat-sub" id="spendSplit">
+            Add an expense to see your 50/30/20 split.
+          </p>
 
-          <p class="stat-sub">Up $180 on April. Most of it was one repair.</p>
+          <a class="btn btn-ghost btn-sm" href="expenses.html"
+             style="margin-top:14px">+ Add an expense</a>
         </article>
 
         <!-- Savings. Gold = prosperity; the one celebratory surface. -->
@@ -109,15 +109,15 @@
             <span aria-hidden="true">&#9819;</span>
           </div>
 
-          <p class="stat-value" id="savedAmount">$4,500</p>
-          <p class="stat-label">Saved so far</p>
+          <p class="stat-value" id="savedAmount">&mdash;</p>
+          <p class="stat-label">Set aside so far</p>
 
-          <div class="progress-track" role="img"
-               aria-label="80 percent of your $5,625 goal">
-            <div class="progress-fill" id="savingsFill" style="width:80%"></div>
+          <div class="progress-track" role="img" id="savingsTrack"
+               aria-label="Progress toward the 20 percent savings target">
+            <div class="progress-fill" id="savingsFill" style="width:0%"></div>
           </div>
 
-          <p class="stat-sub">80% of your $5,625 goal</p>
+          <p class="stat-sub" id="savingsNote">Target: 20% of your income.</p>
         </article>
 
       </section>
@@ -136,25 +136,23 @@
 
             <!-- Every bar is directly labelled: that is what makes the gold
                  series readable without relying on its fill contrast. -->
-            <p class="visually-hidden" id="barsDesc">
-              Needs $2,500, Wants $1,500, Savings and debt $1,000.
-            </p>
+            <p class="visually-hidden" id="barsDesc">Loading your spending.</p>
 
             <div class="bars" role="img" aria-labelledby="barsDesc">
 
               <div class="bar-col">
-                <span class="bar-value">$2,500</span>
-                <div class="bar bar-needs" style="height:83%"></div>
+                <span class="bar-value" id="needsValue">&mdash;</span>
+                <div class="bar bar-needs" id="needsBar" style="height:0%"></div>
               </div>
 
               <div class="bar-col">
-                <span class="bar-value">$1,500</span>
-                <div class="bar bar-wants" style="height:50%"></div>
+                <span class="bar-value" id="wantsValue">&mdash;</span>
+                <div class="bar bar-wants" id="wantsBar" style="height:0%"></div>
               </div>
 
               <div class="bar-col">
-                <span class="bar-value">$1,000</span>
-                <div class="bar bar-savings" style="height:33%"></div>
+                <span class="bar-value" id="savingsValue">&mdash;</span>
+                <div class="bar bar-savings" id="savingsBar" style="height:0%"></div>
               </div>
             </div>
 
@@ -167,12 +165,12 @@
               <table class="data-table">
                 <caption class="visually-hidden">Monthly spending by category</caption>
                 <thead>
-                  <tr><th scope="col">Category</th><th scope="col">Target</th><th scope="col">Spent</th></tr>
+                  <tr><th scope="col">Category</th><th scope="col">Target</th><th scope="col">Spent</th><th scope="col">Actual</th></tr>
                 </thead>
                 <tbody>
-                  <tr><td>Needs</td><td>50%</td><td>$2,500</td></tr>
-                  <tr><td>Wants</td><td>30%</td><td>$1,500</td></tr>
-                  <tr><td>Savings / Debt</td><td>20%</td><td>$1,000</td></tr>
+                  <tr><td>Needs</td><td>50%</td><td id="needsCell">&mdash;</td><td id="needsPctCell">&mdash;</td></tr>
+                  <tr><td>Wants</td><td>30%</td><td id="wantsCell">&mdash;</td><td id="wantsPctCell">&mdash;</td></tr>
+                  <tr><td>Savings / Debt</td><td>20%</td><td id="savingsCell">&mdash;</td><td id="savingsPctCell">&mdash;</td></tr>
                 </tbody>
               </table>
             </details>
@@ -185,17 +183,17 @@
               <li>
                 <span class="swatch swatch-needs" aria-hidden="true"></span>
                 Needs <span class="field-note">(50%)</span>
-                <span class="amount">$2,500</span>
+                <span class="amount" id="needsAmount">&mdash;</span>
               </li>
               <li>
                 <span class="swatch swatch-wants" aria-hidden="true"></span>
                 Wants <span class="field-note">(30%)</span>
-                <span class="amount">$1,500</span>
+                <span class="amount" id="wantsAmount">&mdash;</span>
               </li>
               <li>
                 <span class="swatch swatch-savings" aria-hidden="true"></span>
                 Savings / Debt <span class="field-note">(20%)</span>
-                <span class="amount">$1,000</span>
+                <span class="amount" id="savingsAmount">&mdash;</span>
               </li>
             </ul>
 

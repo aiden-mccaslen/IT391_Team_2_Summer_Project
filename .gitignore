@@ -5,3 +5,4 @@ Backend/logs/
 supabase_operations.txt
 test.py
 __pycache__
+.vscode

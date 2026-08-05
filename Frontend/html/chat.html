@@ -60,50 +60,45 @@
           </p>
         </div>
 
-        <!-- Placeholder figures: there is no budget endpoint yet, so these are
-             static until one exists. Colours match the dashboard charts. -->
+        <!-- Filled from GET /budget by chat.js, so the coach and the sidebar are
+             looking at the same numbers. Colours match the dashboard charts. -->
         <aside class="chat-side" aria-label="Your budget context">
 
           <section class="card">
             <h3>My budget overview</h3>
-            <p class="field-note" style="margin-bottom:14px">50/30/20 this month</p>
+            <p class="field-note" style="margin-bottom:14px">Your 50/30/20 so far</p>
 
             <div class="meter">
               <div class="meter-head">
                 <span><span class="swatch swatch-needs" aria-hidden="true"></span> Needs</span>
-                <span class="amount">$330 left</span>
+                <span class="amount" id="sideNeeds">&mdash;</span>
               </div>
               <div class="meter-track">
-                <div class="meter-fill needs" style="width:78%"></div>
+                <div class="meter-fill needs" id="sideNeedsFill" style="width:0%"></div>
               </div>
             </div>
 
             <div class="meter">
               <div class="meter-head">
                 <span><span class="swatch swatch-wants" aria-hidden="true"></span> Wants</span>
-                <span class="amount">$500 spent</span>
+                <span class="amount" id="sideWants">&mdash;</span>
               </div>
               <div class="meter-track">
-                <div class="meter-fill wants" style="width:56%"></div>
+                <div class="meter-fill wants" id="sideWantsFill" style="width:0%"></div>
               </div>
             </div>
 
             <div class="meter" style="margin-bottom:0">
               <div class="meter-head">
                 <span><span class="swatch swatch-savings" aria-hidden="true"></span> Savings / Debt</span>
-                <span class="amount">$0 left</span>
+                <span class="amount" id="sideSavings">&mdash;</span>
               </div>
               <div class="meter-track">
-                <div class="meter-fill savings" style="width:100%"></div>
+                <div class="meter-fill savings" id="sideSavingsFill" style="width:0%"></div>
               </div>
             </div>
-          </section>
 
-          <section class="card">
-            <h3>Reflection goals</h3>
-            <p style="margin-bottom:6px">Mindful spend count</p>
-            <p class="stat-value" style="font-size:24px">3 / 5</p>
-            <p class="stat-sub">this week</p>
+            <p class="field-note" id="sideNote" style="margin:14px 0 0"></p>
           </section>
 
         </aside>

@@ -4,6 +4,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Expenses</title>
         <link rel="stylesheet" href="../css/style.css" type="text/css">
+        <link rel="stylesheet" href="../css/expenses.css" type="text/css">
 
     </head>
 
@@ -11,22 +12,170 @@
         <div class="toprightdot"></div>
         <h1>Meticulous Budgeting</h1>
         <nav>
-        <a href="index.html">Home page</a>
+        <a href="home.html">Home page</a>
         </nav>
     </header>
 
+    <div class="expenses_welcome">
+        <h2>
+            Enter your expenses and funds here!
+        </h2>
+    </div>
+
     <main>
-        <h>
-            Track your expenses here!
-            <input id="test" type="number" placeholder="Type expense here"/>
-        </h>
-        <button onclick="handleIn()">Save expense</button>
-        <button onclick="clearIn()">Clear</button>
-        <p id="feedback"></p>
+        <!-- I need to clear this form after it's submitted -->
+        <form id="expenseForm"> 
+            <fieldset>
+                <legend>Expense</legend>
+                <label for="amount">Amount ($)</label>      
+                <input
+                    type="number"
+                    id="amount"
+                    name="amount"
+                    placeholder="Enter the amount of this expense"
+                    required
+                >
+                <br>
+
+                <label for="date">Date Purchased</label>
+                <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    
+                /> <!-- Leaving this as not required since people might forget the date of a purchase -->
+
+                <div>Category of Expense:</div>
+                <input
+                    type="radio"
+                    name="category"
+                    id="Rent/Mortgage"
+                    value="Rent/Mortgage"
+                    required
+                />
+                <label for="Rent/Mortgage">Rent/Mortgage</label>
+                <br>
+                    
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Utilities"
+                    value="Utilities"
+                />
+                <label for="Utilities">Utilities</label>
+                <br>
+
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Car Payment"
+                    value="Car Payment"
+                />
+                <label for="Car Payment">Car Payment</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Car Insurance"
+                    value="Car Insurance"
+                />
+                <label for="Car Insurance">Car Insurance</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Streaming Services"
+                    value="Streaming services"
+                />
+                <label for="Streaming Services">Streaming Services</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Groceries"
+                    value="Groceries"
+                />
+                <label for="Groceries">Groceries</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Personal"
+                    value="Personal"
+                />
+                <label for="Personal">Personal</label>
+                <br>
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Unexpected"
+                    value="Unexpected"
+                />
+                <label for="Unexpected">Unexpected</label>
+                <br>
+
+                
+                
+
+
+                <br>
+                <input type="submit"/>
+            </fieldset>
+        </form>
+
+        <form id="fundForm">
+            <fieldset>
+                <legend>Credit</legend>
+                <label for="amount">Amount ($)</label>      
+                <input
+                    type="number"
+                    id="amount"
+                    name="amount"
+                    placeholder="Enter the fund here"
+                    required
+                >
+                <br>
+
+                <div>Account:</div>
+                <input
+                    type="radio"
+                    name="category"
+                    id="Checking"
+                    value="checking"
+                    required
+                />
+                <label for="Checking">Checking</label>
+                <br>
+                    
+
+                <input
+                    type="radio"
+                    name="category"
+                    id="Savings"
+                    value="savings"
+                />
+                <label for="Savings">Savings</label>
+                <br>
+
+
+
+                <br>
+                <input type="submit"/>
+            </fieldset>
+        </form>
+        
+        <!-- <pre id="log"></pre> -->
+        <p>Getting started on tracking expenses</p>
     </main>
 
     <body>
-        <p>Getting started on tracking expenses</p>
         <script src="../javascript/expenses.js"></script>
     </body>
 </html>

@@ -4,55 +4,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Home</title>
-  <link rel="stylesheet" href="../css/style.css" type="text/css"> <!-- updated this to load css-->
+  <title>Meticulous Budgeting | Mindful money for beginners</title>
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
 </head>
 
-<body>
+<!--
+  The entry point. index.html was removed upstream, so the landing content lives
+  here and "/" redirects to this page (see app.py).
+-->
+<body class="landing">
+  <main class="page">
 
-  <header>
-    <div class="toprightdot"></div>
-    <h1>Meticulous Budgeting</h1>
-    <nav>
-      <a href="login.html">Login page</a>
-      <a href="#team">Hyperlink 2</a>
-      <a href="#Hyperlink 3">Hyperlink 3</a>
-    </nav>
-  </header>
+    <div class="wrap">
+      <header class="site-header">
+        <a class="brand" href="home.html">
+          <span class="brand-mark" aria-hidden="true">&#165;</span>
+          <span>Meticulous<br>Budgeting</span>
+        </a>
 
-  <main>
-    <section id="graphs">
-      <h2>Services</h2>
-      <p>We craft responsive websites and design systems.</p>
-    </section>
-
-    <div id="chatbot" class="chatbot">
-      <h2>AI finance Chatbot</h2>
-      <p>Ask your Kakeibo coach anything about money and habits.</p>
-
-      <div id="chatMessages" class="chat-messages"></div>
-
-      <form id="chatForm" class="chat-form">
-        <input
-          type="text"
-          id="chatInput"
-          name="chatInput"
-          placeholder="Type your message..."
-          autocomplete="off"
-          required
-        >
-        <button type="submit">Send</button>
-      </form>
+        <nav class="site-nav" aria-label="Main">
+          <a href="onboarding.html">How it works</a>
+          <a href="expenses.html">Expense tracking</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a class="btn btn-gold btn-sm" href="login.html">Sign In</a>
+        </nav>
+      </header>
     </div>
+
+    <div class="wrap">
+      <section class="hero">
+
+        <div>
+          <div class="hero-art" aria-hidden="true">
+            <!-- Inline so the page has no external asset to fetch. -->
+            <svg width="320" height="200" viewBox="0 0 320 200" role="img">
+              <ellipse cx="160" cy="178" rx="126" ry="12" fill="#EDE3F7"></ellipse>
+              <rect x="52" y="74" width="96" height="84" rx="12" fill="#5A2185"></rect>
+              <rect x="66" y="92" width="68" height="8" rx="4" fill="#FFFFFF" opacity="0.85"></rect>
+              <rect x="66" y="110" width="46" height="8" rx="4" fill="#FFFFFF" opacity="0.55"></rect>
+              <rect x="66" y="128" width="56" height="8" rx="4" fill="#FFFFFF" opacity="0.35"></rect>
+              <circle cx="214" cy="70" r="34" fill="#E9B824"></circle>
+              <text x="214" y="80" text-anchor="middle" font-size="30"
+                    font-family="Segoe UI, sans-serif" font-weight="700" fill="#35125A">&#165;</text>
+              <rect x="176" y="118" width="76" height="40" rx="10" fill="#A265D8"></rect>
+              <rect x="188" y="132" width="52" height="6" rx="3" fill="#FFFFFF" opacity="0.8"></rect>
+              <path d="M262 150 L280 128 L296 140 L312 108" stroke="#C99512"
+                    stroke-width="3" fill="none" stroke-linecap="round"></path>
+            </svg>
+          </div>
+
+          <h1>Mindful money, brighter future.</h1>
+
+          <p class="hero-lede">
+            Meticulous Budgeting pairs the 50/30/20 rule with Kakeibo reflection
+            &mdash; the Japanese practice of asking <em>why</em> before you spend.
+            Built for people starting from zero. No jargon, no shame.
+          </p>
+
+          <ul class="hero-points">
+            <li><span aria-hidden="true">&#9679;</span> Track spending and see it split into needs, wants and savings.</li>
+            <li><span aria-hidden="true">&#9679;</span> Answer four short questions before an impulse buy.</li>
+            <li><span aria-hidden="true">&#9679;</span> Ask your Kakeibo coach anything, any time.</li>
+          </ul>
+
+          <p class="field-note" style="margin-top:20px">
+            Every budgeting and reflection feature is free. Always.
+            <span class="badge badge-free">Free core</span>
+          </p>
+        </div>
+
+        <section class="signup-panel" aria-labelledby="signup-heading">
+          <h2 id="signup-heading">Start your journey today</h2>
+          <p>It takes about a minute. No card, no credit check.</p>
+
+          <form id="signupForm" novalidate>
+            <label for="fullName">Full name</label>
+            <input type="text" id="fullName" name="fullName"
+                   placeholder="Enter your full name" autocomplete="name"
+                   minlength="2" maxlength="64" required>
+
+            <label for="email">Email address</label>
+            <input type="email" id="email" name="email"
+                   placeholder="you@example.com" autocomplete="email"
+                   autocapitalize="none" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password"
+                   placeholder="At least 8 characters" autocomplete="new-password"
+                   minlength="8" maxlength="64" required>
+
+            <label for="passwordConfirmation">Confirm password</label>
+            <input type="password" id="passwordConfirmation" name="passwordConfirmation"
+                   placeholder="Type it once more" autocomplete="new-password"
+                   minlength="8" maxlength="64" required>
+
+            <button class="btn-gold btn-block" type="submit">Sign up for free</button>
+          </form>
+
+          <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
+
+          <p style="margin-top:16px; text-align:center; font-size:14px">
+            Already have an account? <a href="login.html">Log in</a>
+          </p>
+
+          <p class="legal">
+            By signing up you agree to our terms and privacy policy.
+          </p>
+        </section>
+
+      </section>
+    </div>
+
+    <div class="wrap">
+      <footer class="site-footer">
+        <p style="margin:0">
+          Meticulous Budgeting is a learning tool: it uses Kakeibo and 50/30/20
+          budgeting to help a younger audience build habits before the stakes get high.
+        </p>
+      </footer>
+    </div>
+
   </main>
 
-  <footer>
-    <p>Meticulous Budgeting is an app using Kekeibo budgeting and 
-        50/30/20 budgeting to help a young audience with their financial downfalls.</p>
-  </footer>
-
-  <script src="../javascript/api.js"></script> <!-- chat.js needs this first -->
-  <script src="../javascript/chat.js"></script>
-
+  <script src="../javascript/api.js"></script>
+  <script src="../javascript/script.js"></script>
 </body>
 </html>

@@ -50,6 +50,7 @@ function startChat() {
     }
 
     checkCoachHealth();
+    loadBudgetSidebar();
 }
 
 /* Rendering -------------------------------------------------------------- */
@@ -151,6 +152,55 @@ async function loadTranscript(id) {
     result.messages.forEach(function (entry) {
         addMessage(entry.role, entry.content);
     });
+}
+
+/* Budget sidebar ----------------------------------------------------------
+ * Optional: only the dedicated chat page has it. Same GET /budget the dashboard
+ * uses, so the coach and the sidebar never disagree about the numbers.
+ * ------------------------------------------------------------------------- */
+async function loadBudgetSidebar() {
+    if (!document.getElementById("sideNeeds") || !auth.isLoggedIn()) {
+        return;
+    }
+
+    const result = await api.budget();
+    const note = document.getElementById("sideNote");
+
+    if (!result.success) {
+        if (note) {
+            note.textContent = result.message;
+        }
+        return;
+    }
+
+    const money = new Intl.NumberFormat(undefined, {
+        style: "currency", currency: "USD", maximumFractionDigits: 0,
+    });
+
+    const budget = result.budget;
+    const rows = [
+        { key: "sideNeeds", amount: Number(budget.Need) || 0, percent: budget.NeedPercent, target: 50 },
+        { key: "sideWants", amount: Number(budget.Want) || 0, percent: budget.WantPercent, target: 30 },
+        { key: "sideSavings", amount: Number(budget.Savings) || 0, percent: budget.SavingsPercent, target: 20 },
+    ];
+
+    rows.forEach(function (row) {
+        const label = document.getElementById(row.key);
+        if (label) {
+            label.textContent = `${money.format(row.amount)} spent`;
+        }
+
+        const fill = document.getElementById(`${row.key}Fill`);
+        if (fill) {
+            // Share of that category's own target, capped at the track width.
+            const used = Math.min(100, ((Number(row.percent) || 0) / row.target) * 100);
+            fill.style.width = `${used}%`;
+        }
+    });
+
+    if (note && result.warnings && result.warnings.length) {
+        note.textContent = result.warnings.join(" ");
+    }
 }
 
 /* Coach availability ------------------------------------------------------ */

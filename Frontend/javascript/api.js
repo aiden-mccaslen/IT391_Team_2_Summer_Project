@@ -121,6 +121,14 @@ const api = {
         });
     },
 
+    /* The 50/30/20 split of everything logged so far, plus any warnings about
+     * being over 50/30 or under 20. Shape:
+     *   {success, budget: {Need, Want, Savings, NeedPercent, WantPercent,
+     *                      SavingsPercent}, warnings: [...]} */
+    budget() {
+        return request("/budget", { authed: true });
+    },
+
     conversations() {
         return request("/conversations", { authed: true });
     },
