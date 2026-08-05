@@ -84,21 +84,25 @@ def expense():
     data = request.get_json() 
     access_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
 
-    if(len(data) > 2):
+    if(len(data) > 2): # This is a very crude way to check if an expense or credit is being sent
         amount = data["amount"]
         purchase_date = data["purchase_date"]
         category = data["category"]
         print(access_token)
         status = expenses.report_expense(access_token, amount, purchase_date, category)
     else:
+        print("debug 1")
         amount = data["amount"]
         account = data["account"]
         status = expenses.report_fund(access_token, amount, account)
+        print("debug 2")
 
     return jsonify ({
         "success": status[0],
         "message": status[1]
     })
+
+
 
 @app.route("/budget", methods=["GET"])
 def get_budget():
@@ -115,7 +119,7 @@ def get_budget():
             "message": expenses_data
         })
 
-    success, funds_data = expenses.get_funds(access_token)
+    success, funds_data = expenses.get_balance(access_token)
 
     if not success:
         return jsonify({
@@ -123,12 +127,22 @@ def get_budget():
             "message": funds_data
         })
 
-    income = 0
+    checking, savings = expenses._split_funds(funds_data) # I updated the funds table and made a split funds function
+                                                          # to grab the information from each account easier
+    income = checking
+
+
+    #Updated this
+    """income = 0
 
     if len(funds_data) > 0:
-        income = float(funds_data[0]["amount"])
+    income = float(funds_data[0]["amount"])"""
 
+    # This user info from the _split_funds helper function since I updated
     summary = budget.calculate_budget(income, expenses_data)
+
+    summary["Savings"] = savings #Regrabbing savings using _split_funds function
+
     warnings = budget.evaluate_budget(summary)
 
     return jsonify({
@@ -177,7 +191,7 @@ def evaluate_purchase():
             "message": expenses_data
         })
 
-    success, funds_data = expenses.get_funds(access_token)
+    success, funds_data = expenses.get_balance(access_token)
 
     if not success:
         return jsonify({
@@ -185,7 +199,8 @@ def evaluate_purchase():
             "message": funds_data
         })
 
-    income = float(funds_data[0]["amount"])
+    checking, _ = _split_funds(funds_data)
+    income = checking
 
     result = purchase_rules.evaluate_purchase(
     income,

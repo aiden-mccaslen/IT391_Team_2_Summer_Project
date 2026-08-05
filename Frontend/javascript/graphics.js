@@ -1,55 +1,140 @@
 const ctx = document.getElementById('myChart');
 let myChart; // Instantiate the chart to be blank so that we can call it in setChartType and manipulate it
-let jsonData; // Instantiate the jsonData so that we don't have to call for it multiple times if we choose to update it.
-
+let budgetSummary; // instantiate the data { Need, Want, Savings, NeedPercent, WantPercent, SavingsPercent } so chart-type switches don't refetch
 
 const API_BASE_URL = "http://localhost:5000";
 
-async function onClickGraph(){
-    console.log("Button cliked to create user graph");
-    const response = await fetch(`${API_BASE_URL}/graphics`, {
+// Canvas doesn't resolve CSS custom properties, so read them once into plain hex strings.
+const rootStyles = getComputedStyle(document.documentElement);
+const CATEGORY_COLORS = {
+    Need: rootStyles.getPropertyValue('--needs-color').trim(),
+    Want: rootStyles.getPropertyValue('--wants-color').trim(),
+    Savings: rootStyles.getPropertyValue('--savings-color').trim()
+};
+const CHART_GRIDLINE_COLOR = rootStyles.getPropertyValue('--chart-gridline').trim();
+
+window.addEventListener("DOMContentLoaded", loadDashboard);
+
+async function loadDashboard() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/budget`, {
             method: "GET",
             headers: {
-                "Content-Type": "application/json",
                 "Authorization": `Bearer ${localStorage.getItem("access_token")}`
-            },
+            }
         });
-    const result = await response.json();
-    console.log("Response: ", result);
+        const result = await response.json();
+        console.log("Budget response:", result);
 
-    if (result.success) {
-        jsonData = result.data;
-        createChart(jsonData, "bar");
-    } else {
-        alert(result.message);
+        if (!result.success) {
+            alert(result.message);
+            return;
+        }
+
+        budgetSummary = result.budget;
+        renderBreakdown(budgetSummary, result.warnings);
+        createChart(budgetSummary, "bar");
+
+        // Only safe to switch chart types once budgetSummary is actually populated.
+        for (const button of document.querySelectorAll("#chartTypeToggle button")) {
+            button.disabled = false;
+        }
+    } catch (error) {
+        console.error("Failed to load budget data:", error);
+    }
+}
+
+function renderBreakdown(budget, warnings) {
+    const list = document.getElementById("breakdownList");
+    list.innerHTML = "";
+
+    const rows = [
+        { label: `Needs (${budget.NeedPercent}%)`, amount: budget.Need, color: CATEGORY_COLORS.Need },
+        { label: `Wants (${budget.WantPercent}%)`, amount: budget.Want, color: CATEGORY_COLORS.Want },
+        { label: `Savings (${budget.SavingsPercent}%)`, amount: budget.Savings, color: CATEGORY_COLORS.Savings }
+    ];
+
+    for (const row of rows) {
+        const item = document.createElement("li");
+
+        const swatch = document.createElement("span");
+        swatch.className = "legend-swatch";
+        swatch.style.backgroundColor = row.color;
+
+        const label = document.createElement("span");
+        label.className = "legend-label";
+        label.textContent = row.label;
+
+        const amount = document.createElement("span");
+        amount.className = "legend-amount";
+        amount.textContent = `$${row.amount.toFixed(2)}`;
+
+        item.append(swatch, label, amount);
+        list.appendChild(item);
+    }
+
+    const warningsBox = document.getElementById("warningsList");
+    warningsBox.innerHTML = "";
+    for (const warning of warnings) {
+        const chip = document.createElement("p");
+        chip.className = "warning-chip";
+        chip.textContent = warning;
+        warningsBox.appendChild(chip);
     }
 }
 
 function setChartType(chartType) { // This function is overwriting the old chart with the same data but updated type
-    myChart.destroy();
-    createChart(jsonData, chartType);
+    if (!budgetSummary) {
+        console.warn("Chart data hasn't loaded yet; ignoring chart-type change.");
+        return;
+    }
+    if (myChart) {
+        myChart.destroy();
+    }
+    createChart(budgetSummary, chartType);
 }
 
-// Maybe make this function async to wait and show only when pressing which graph you want to see in the html
-// I need to pass JSON data with 'purchase_date' and 'amount'
-function createChart(data, type){ // Data is the JSON data, type is the type of chart        maybe -> , dataCol is the data being graph (e.g. am)
+function createChart(budget, type) {
+    const labels = ["Needs", "Wants", "Savings"];
+    const values = [budget.Need, budget.Want, budget.Savings];
+    const colors = [CATEGORY_COLORS.Need, CATEGORY_COLORS.Want, CATEGORY_COLORS.Savings];
+
     myChart = new Chart(ctx, {
-    type: type, // type of graph
-    data: {
-        labels: data.map(row => row.purchase_date),
-        datasets: [{
-        label: 'Amount by Purchase Date',
-        data: data.map(row => row.amount),
-        borderWidth: 1 // Sets the top of the graph 1 higher than max index
-        }]
-    },
-    options: {
-        scales: {
-        y: {
-            beginAtZero: true
+        type: type,
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Amount ($)",
+                data: values,
+                backgroundColor: colors,
+                borderRadius: 4,
+                borderSkipped: type === "bar" ? "bottom" : undefined,
+                maxBarThickness: 24
+            }]
         },
-        },
-        maintainApectRatio: true
-    }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                // The breakdown card already serves as the legend (swatch + label + amount),
+                // so Chart.js's own legend would just be a redundant single-entry box.
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => `$${item.parsed.y ?? item.parsed}`
+                    }
+                }
+            },
+            scales: type === "pie" ? {} : {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: CHART_GRIDLINE_COLOR },
+                    ticks: { callback: (value) => `$${value}` }
+                },
+                x: {
+                    grid: { display: false }
+                }
+            }
+        }
     });
 }

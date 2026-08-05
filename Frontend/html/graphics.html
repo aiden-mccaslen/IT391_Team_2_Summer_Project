@@ -13,6 +13,8 @@
         <h1>Meticulous Budgeting</h1>
         <nav>
         <a href="home.html">Home page</a>
+        <a href="expenses.html">Add expenses</a>
+        <a href="dashboard.html">Dashboard</a>
         </nav>
     </header>
 
@@ -23,14 +25,30 @@
     </div>
 
     <main>
-        
-        <div class="chart">
-            <div>
-                <button onclick="onClickGraph('Pie')">Pie</button>
-            </div>
-            <canvas id="myChart"></canvas>
+
+        <div class="dashboard">
+            <section class="chart-card">
+                <div class="chart-card-header">
+                    <h3>Monthly Expense Analysis</h3>
+                    <div class="chart-type-toggle" id="chartTypeToggle">
+                        <button type="button" disabled onclick="setChartType('bar')">Bar</button>
+                        <button type="button" disabled onclick="setChartType('line')">Line</button>
+                        <button type="button" disabled onclick="setChartType('pie')">Pie</button>
+                    </div>
+                </div>
+                <div class="chart-canvas-wrap">
+                    <canvas id="myChart"></canvas>
+                </div>
+            </section>
+
+            <section class="breakdown-card">
+                <h3>50/30/20 Breakdown</h3>
+                <ul class="legend-list" id="breakdownList"></ul>
+
+                <div class="warnings-list" id="warningsList"></div>
+            </section>
         </div>
-        
+
     </main>
 
     <body>

@@ -3,15 +3,6 @@ const expenseForm = document.getElementById("expenseForm");
 console.log("before fundform")
 const fundForm = document.getElementById("fundForm");
 
-// console.log("before dumbshit")
-// document.querySelector('form').onsubmit = e => {
-//    e.target.submit();
-//    e.target.reset();
-//    return false;
-// };
-
-// const log = document.querySelector("#log");
-
 const API_BASE_URL = "http://localhost:5000";
 console.log("Before first log")
 console.log(expenseForm)
@@ -93,31 +84,11 @@ async function sendExpenseRequest(expenseData) {
         console.error("Expense request failed:", error);
     }
 }
-console.log("before fund if")
 
 if (fundForm) {
     fundForm.addEventListener("submit", function(event) {
         event.preventDefault();
         const fundData = new FormData(fundForm);
-        // let amount;
-        // let purchase_date;
-        // let category = "";
-        // for(const entry of data){
-        //     console.log("entry: "+entry)
-
-        //     if(entry[0] == "amount"){
-        //         amount = entry[1];
-        //         // const amount = amountInput.value;
-        //         console.log(amount)
-        //     }
-
-        //     if(entry[0] == "account"){
-        //         account = entry[1];
-        //         console.log(category)
-        //     }
-
-            
-        // }
         const fund = fundData.get("amount");
         const account = fundData.get("account")
         console.log("fund: "+ fund);
@@ -128,11 +99,8 @@ if (fundForm) {
 
 }
 
-console.log("after fund if")
 async function sendFundRequest(fundData) {
-    console.log("before try");
     try {
-        console.log("start-try");
         const response = await fetch(`${API_BASE_URL}/expenses`, {
             method: "POST",
             headers: {
@@ -141,7 +109,6 @@ async function sendFundRequest(fundData) {
             },
             body: JSON.stringify(fundData)
         });
-        console.log("bulls");
         const result = await response.json();
 
         if (result.success) {

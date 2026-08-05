@@ -65,7 +65,7 @@ def calculate_budget(income, expenses):
 
         "NeedPercent": round((totals["Need"] / income) * 100, 2),
         "WantPercent": round((totals["Want"] / income) * 100, 2),
-        "SavingsPercent": round((totals["Savings"] / income) * 100, 2)
+        "SavingsPercent": round((totals["Savings"] / income) * 100, 2) # We might want to check that the income is > 0
     }
 
 def evaluate_budget(summary):

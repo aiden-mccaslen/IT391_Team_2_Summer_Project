@@ -56,13 +56,14 @@ def report_fund(access_token, amount, account): # can't have checking and saving
         user_response = supabase_client.auth.get_user(access_token)
         uuid = user_response.user.id
 
+        print("funding")
         response = (
             supabase_client.table("funds")
             .upsert({
                 "user_id": uuid,
                 "amount": amount,
                 "account": account
-            }, on_conflict="user_id")
+            }, on_conflict="user_id,account") # Updated the unique restriction in the funds table so each user_id can have an account 
             .execute()
         )
         return (True, response.data)
@@ -86,3 +87,14 @@ def get_balance(access_token): # gets income form supabase
 
     except Exception as e:
         return (False, str(e))
+
+def _split_funds(funds_data):
+# funds_data holds one row per account ("checking", "savings")
+    checking = 0.0
+    savings = 0.0
+    for fund in funds_data:
+        if fund["account"] == "checking":
+            checking = float(fund["amount"])
+        elif fund["account"] == "savings":
+            savings = float(fund["amount"])
+    return checking, savings
