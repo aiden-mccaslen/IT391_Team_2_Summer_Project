@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kakeibo coach | Meticulous Budgeting</title>
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
+</head>
+
+<body class="chat-page">
+
+  <header class="app-header">
+    <div class="wrap">
+      <a class="brand" href="dashboard.html">
+        <span class="brand-mark" aria-hidden="true">&#165;</span>
+        <span>Meticulous Budgeting</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="expenses.html">Expenses</a>
+        <a href="chat.html" aria-current="page">Coach</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="wrap">
+      <section class="chat-layout">
+
+        <div class="chatbot" id="chatbot">
+          <h2>AI Kakeibo chat reflection</h2>
+          <p>Mindful finance for beginners &mdash; 50/30/20 and reflection.</p>
+
+          <p class="ai-offline" id="aiOffline" role="status">
+            The coach is unavailable right now. Your budgeting tools still work
+            as normal &mdash; try again in a little while.
+          </p>
+
+          <div id="chatMessages" class="chat-messages" role="log"
+               aria-live="polite" aria-label="Conversation with your coach">
+            <!-- Removed by chat.js as soon as the first message lands. -->
+            <p class="chat-empty" id="chatEmpty">
+              Tell your coach about a purchase you are weighing, or something
+              that went well this week. There is no wrong place to start.
+            </p>
+          </div>
+
+          <form id="chatForm" class="chat-form">
+            <label class="visually-hidden" for="chatInput">Your reflection</label>
+            <input type="text" id="chatInput" name="chatInput"
+                   placeholder="Type your reflection&hellip;" autocomplete="off"
+                   maxlength="1000" required>
+            <button class="btn-gold" type="submit">Send</button>
+          </form>
+
+          <p class="field-note" style="margin-top:10px">
+            One paragraph at a time works best &mdash; up to 1,000 characters.
+          </p>
+        </div>
+
+        <!-- Filled from GET /budget by chat.js, so the coach and the sidebar are
+             looking at the same numbers. Colours match the dashboard charts. -->
+        <aside class="chat-side" aria-label="Your budget context">
+
+          <section class="card">
+            <h3>My budget overview</h3>
+            <p class="field-note" style="margin-bottom:14px">Your 50/30/20 so far</p>
+
+            <div class="meter">
+              <div class="meter-head">
+                <span><span class="swatch swatch-needs" aria-hidden="true"></span> Needs</span>
+                <span class="amount" id="sideNeeds">&mdash;</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill needs" id="sideNeedsFill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="meter">
+              <div class="meter-head">
+                <span><span class="swatch swatch-wants" aria-hidden="true"></span> Wants</span>
+                <span class="amount" id="sideWants">&mdash;</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill wants" id="sideWantsFill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="meter" style="margin-bottom:0">
+              <div class="meter-head">
+                <span><span class="swatch swatch-savings" aria-hidden="true"></span> Savings / Debt</span>
+                <span class="amount" id="sideSavings">&mdash;</span>
+              </div>
+              <div class="meter-track">
+                <div class="meter-fill savings" id="sideSavingsFill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <p class="field-note" id="sideNote" style="margin:14px 0 0"></p>
+          </section>
+
+        </aside>
+
+      </section>
+    </div>
+  </main>
+
+  <script src="../javascript/api.js"></script>
+  <script src="../javascript/chat.js"></script>
+</body>
+</html>

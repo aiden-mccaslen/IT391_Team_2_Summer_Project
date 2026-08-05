@@ -1,121 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dashboard | Meticulous Budgeting</title>
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
 </head>
-<body class="app-page">
-  <header class="site-header">
-    <a class="brand" href="home.html" aria-label="Meticulous Budgeting home">
-      <span class="brand-dot" aria-hidden="true"></span>
-      <span>Meticulous Budgeting</span>
-    </a>
-    <nav aria-label="Main navigation">
-      <a href="home.html">Home</a>
-      <a class="active" href="dashboard.html" aria-current="page">Dashboard</a>
-      <a href="expenses.html">Expenses</a>
-      <a href="login.html">Log out</a>
-    </nav>
+
+<!--
+  Every figure here comes from GET /budget via dashboard.js -- the markup ships
+  em-dashes and zero-height bars, and the real numbers land once the request
+  returns. Nothing on this page is invented.
+-->
+<body class="dashboard">
+
+  <header class="app-header">
+    <div class="wrap">
+      <a class="brand" href="home.html">
+        <span class="brand-mark" aria-hidden="true">&#165;</span>
+        <span>Meticulous Budgeting</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <a href="dashboard.html" aria-current="page">Dashboard</a>
+        <a href="expenses.html">Expenses</a>
+        <a href="savings.html">Savings</a>
+        <a href="chat.html">Coach</a>
+
+        <div class="profile">
+          <button class="avatar-btn" id="avatarBtn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+            <span id="avatarInitials" aria-hidden="true">&#183;&#183;</span>
+            <span class="visually-hidden">Open profile menu</span>
+          </button>
+
+          <div class="profile-menu" id="profileMenu" hidden>
+            <a href="profile.html">Profile</a>
+            <a href="profile.html#settings">Settings</a>
+            <a href="profile.html#notifications">Notifications</a>
+            <!-- The only upgrade cue in the app. Nothing on this page is gated. -->
+            <a class="menu-premium" href="profile.html#premium">Premium &#9733;</a>
+            <a href="#" id="logoutLink">Log out</a>
+          </div>
+        </div>
+      </nav>
+    </div>
   </header>
 
-  <main class="dashboard-main">
-    <section class="dashboard-welcome">
-      <div>
-        <span class="eyebrow">Financial overview</span>
-        <h1>Welcome to your dashboard!</h1>
-        <p>See your progress, understand your spending, and choose your next smart money move.</p>
+  <main class="page">
+    <div class="wrap">
+
+      <div class="dash-greeting">
+        <h1 id="greeting">Welcome back</h1>
+        <p>
+          A look at <span id="monthName">this month</span>
+          &mdash; and what it might be telling you.
+        </p>
       </div>
-      <a class="button-link" href="expenses.html">+ Add an expense</a>
-    </section>
 
-    <section class="dashboard-summary" aria-label="Monthly summary">
-      <article class="dashboard-stat featured-stat">
-        <div class="stat-icon" aria-hidden="true">$</div>
-        <div>
-          <span>Spent this month</span>
-          <strong id="dashboardTotal">$0.00</strong>
-          <small id="monthName">Current month</small>
-        </div>
-      </article>
-      <article class="dashboard-stat">
-        <div class="stat-icon purple-icon" aria-hidden="true">#</div>
-        <div>
-          <span>Transactions</span>
-          <strong id="transactionCount">0</strong>
-          <small>Recorded this month</small>
-        </div>
-      </article>
-      <article class="dashboard-stat">
-        <div class="stat-icon green-icon" aria-hidden="true">✓</div>
-        <div>
-          <span>Largest category</span>
-          <strong id="largestCategory">None yet</strong>
-          <small id="largestCategoryAmount">Start tracking today</small>
-        </div>
-      </article>
-    </section>
+      <!-- Populated from /budget when it returns warnings (over 50/30, under 20). -->
+      <p class="budget-warnings" id="budgetWarnings" hidden></p>
 
-    <div class="dashboard-grid">
-      <section class="panel budget-breakdown">
-        <div class="panel-heading">
-          <div>
-            <h2>50/30/20 breakdown</h2>
-            <p>How this month's activity is divided.</p>
+      <!-- Three quick-glance cards ------------------------------------------ -->
+      <section class="dash-top" aria-label="This month at a glance">
+
+        <!-- Flexible slot: goals today, weekly AI probing questions later. -->
+        <article class="card card-reflection">
+          <div class="card-title">
+            <h3>Weekly reflection</h3>
+            <span class="hint-dot" title="Your coach asks one short question each week.">?</span>
           </div>
-          <a href="expenses.html">View details</a>
+
+          <p class="ai-prompt">
+            <strong>AI guide</strong>
+            "What purchase brought you the most joy this week, and why?"
+          </p>
+
+          <form id="reflectionForm">
+            <label class="visually-hidden" for="reflectionInput">Your reflection</label>
+            <input type="text" id="reflectionInput" placeholder="Type your answer&hellip;"
+                   autocomplete="off">
+          </form>
+        </article>
+
+        <!-- Spend to date. There is no historical series behind /budget yet, so
+             this states the real total rather than drawing an invented trend. -->
+        <article class="card">
+          <div class="card-title">
+            <h3>Spent this month</h3>
+          </div>
+
+          <p class="stat-value" id="dashboardTotal">&mdash;</p>
+          <p class="stat-label">Across needs, wants and savings</p>
+
+          <p class="stat-sub" id="spendSplit">
+            Add an expense to see your 50/30/20 split.
+          </p>
+
+          <a class="btn btn-ghost btn-sm" href="expenses.html"
+             style="margin-top:14px">+ Add an expense</a>
+        </article>
+
+        <!-- Savings. Gold = prosperity; the one celebratory surface. -->
+        <article class="card card-savings">
+          <div class="card-title">
+            <h3>Savings progress</h3>
+            <span aria-hidden="true">&#9819;</span>
+          </div>
+
+          <p class="stat-value" id="savedAmount">&mdash;</p>
+          <p class="stat-label">Set aside so far</p>
+
+          <div class="progress-track" role="img" id="savingsTrack"
+               aria-label="Progress toward the 20 percent savings target">
+            <div class="progress-fill" id="savingsFill" style="width:0%"></div>
+          </div>
+
+          <p class="stat-sub" id="savingsNote">Target: 20% of your income.</p>
+        </article>
+
+      </section>
+
+      <!-- Main Kakeibo analysis panel --------------------------------------- -->
+      <section class="card" aria-labelledby="analysisHeading">
+        <div class="card-title">
+          <h3 id="analysisHeading">Monthly expense analysis</h3>
+          <a class="btn btn-ghost btn-sm" href="chat.html">Discuss with coach</a>
         </div>
 
-        <div class="budget-ring-wrap">
-          <div id="budgetRing" class="budget-ring" role="img" aria-label="No spending data yet">
-            <div class="ring-center">
-              <strong id="ringTotal">$0</strong>
-              <span>Total</span>
+        <div class="dash-analysis">
+
+          <figure class="chart" style="margin:0">
+            <figcaption>Where this month's money went, against the 50/30/20 split.</figcaption>
+
+            <!-- Every bar is directly labelled: that is what makes the gold
+                 series readable without relying on its fill contrast. -->
+            <p class="visually-hidden" id="barsDesc">Loading your spending.</p>
+
+            <div class="bars" role="img" aria-labelledby="barsDesc">
+
+              <div class="bar-col">
+                <span class="bar-value" id="needsValue">&mdash;</span>
+                <div class="bar bar-needs" id="needsBar" style="height:0%"></div>
+              </div>
+
+              <div class="bar-col">
+                <span class="bar-value" id="wantsValue">&mdash;</span>
+                <div class="bar bar-wants" id="wantsBar" style="height:0%"></div>
+              </div>
+
+              <div class="bar-col">
+                <span class="bar-value" id="savingsValue">&mdash;</span>
+                <div class="bar bar-savings" id="savingsBar" style="height:0%"></div>
+              </div>
+            </div>
+
+            <div class="bar-labels" aria-hidden="true">
+              <span>Needs</span><span>Wants</span><span>Savings / Debt</span>
+            </div>
+
+            <details class="table-toggle">
+              <summary>View as a table</summary>
+              <table class="data-table">
+                <caption class="visually-hidden">Monthly spending by category</caption>
+                <thead>
+                  <tr><th scope="col">Category</th><th scope="col">Target</th><th scope="col">Spent</th><th scope="col">Actual</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Needs</td><td>50%</td><td id="needsCell">&mdash;</td><td id="needsPctCell">&mdash;</td></tr>
+                  <tr><td>Wants</td><td>30%</td><td id="wantsCell">&mdash;</td><td id="wantsPctCell">&mdash;</td></tr>
+                  <tr><td>Savings / Debt</td><td>20%</td><td id="savingsCell">&mdash;</td><td id="savingsPctCell">&mdash;</td></tr>
+                </tbody>
+              </table>
+            </details>
+          </figure>
+
+          <div>
+            <h4 style="margin-top:0">50/30/20 breakdown</h4>
+
+            <ul class="breakdown-list">
+              <li>
+                <span class="swatch swatch-needs" aria-hidden="true"></span>
+                Needs <span class="field-note">(50%)</span>
+                <span class="amount" id="needsAmount">&mdash;</span>
+              </li>
+              <li>
+                <span class="swatch swatch-wants" aria-hidden="true"></span>
+                Wants <span class="field-note">(30%)</span>
+                <span class="amount" id="wantsAmount">&mdash;</span>
+              </li>
+              <li>
+                <span class="swatch swatch-savings" aria-hidden="true"></span>
+                Savings / Debt <span class="field-note">(20%)</span>
+                <span class="amount" id="savingsAmount">&mdash;</span>
+              </li>
+            </ul>
+
+            <div class="cues">
+              <h4>Kakeibo reflection cues</h4>
+              <dl>
+                <dt>Needs</dt>
+                <dd>How did this spending align with your core values?</dd>
+
+                <dt>Wants</dt>
+                <dd>Which of these were truly essential for your well-being?</dd>
+
+                <dt>Savings</dt>
+                <dd>Are you confident in your progress toward long-term goals?</dd>
+              </dl>
             </div>
           </div>
-          <div class="budget-legend">
-            <div class="legend-row"><span class="legend-dot needs-dot"></span><div><strong>Needs</strong><small>Suggested: 50%</small></div><b id="needsPercent">0%</b></div>
-            <div class="legend-row"><span class="legend-dot wants-dot"></span><div><strong>Wants</strong><small>Suggested: 30%</small></div><b id="wantsPercent">0%</b></div>
-            <div class="legend-row"><span class="legend-dot savings-dot"></span><div><strong>Savings & debt</strong><small>Suggested: 20%</small></div><b id="savingsPercent">0%</b></div>
-          </div>
+
         </div>
       </section>
 
-      <aside class="panel coach-card">
-        <span class="coach-badge">Kakeibo check-in</span>
-        <h2>Before your next purchase.</h2>
-        <p>Ask yourself: Do I need it, can I afford it, will I use it, and do I have space for it?</p>
-        <a class="button-link light-button" href="home.html#chatbot">Ask the finance coach</a>
-      </aside>
-
-      <section class="panel recent-dashboard-expenses">
-        <div class="panel-heading">
-          <div>
-            <h2>Recent expenses</h2>
-            <p>Your latest activity across all dates.</p>
-          </div>
-          <a href="expenses.html">See all</a>
-        </div>
-        <div id="dashboardTransactions" class="transaction-list"></div>
-        <div id="dashboardEmpty" class="dashboard-empty">
-          
-          <div><h3>Your activity will appear here</h3><p>Add an expense to begin building your overview.</p></div>
-        </div>
-      </section>
-
-      <section class="panel quick-actions">
-        <h2>Quick actions</h2>
-        <p>Brush up with your coach or check your expenses.</p>
-        <div class="action-links">
-          <a href="expenses.html"><span>＋</span><div><strong>Record spending</strong><small>Add a new expense</small></div><b>›</b></a>
-          <a href="home.html#chatbot"><span>✦</span><div><strong>Ask your coach</strong><small>Get budgeting guidance</small></div><b>›</b></a>
-        </div>
-      </section>
     </div>
   </main>
 
-  
+  <!-- Docked coach bar. Sends straight to /chat; the reply opens in the full
+       conversation view so the thread is never lost behind a page change. -->
+  <div class="chat-dock">
+    <form id="dockForm">
+      <span class="dock-label">
+        <span aria-hidden="true">&#128172;</span>
+        <span>Ask your Kakeibo guide</span>
+      </span>
+
+      <label class="visually-hidden" for="dockInput">Message your coach</label>
+      <input type="text" id="dockInput" placeholder="Ask your Kakeibo guide&hellip;"
+             autocomplete="off" maxlength="1000" required>
+
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <script src="../javascript/api.js"></script>
   <script src="../javascript/dashboard.js"></script>
 </body>
 </html>
