@@ -75,8 +75,7 @@ async function request(path, { method = "GET", body = null, authed = false } = {
         }
         headers["Authorization"] = `Bearer ${token}`;
     }
-console.log("API_BASE_URL:", API_BASE_URL);
-console.log("Request URL:", `${API_BASE_URL}${path}`);
+    
     try {
         const response = await fetch(`${API_BASE_URL}${path}`, {
             method,
