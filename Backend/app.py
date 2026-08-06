@@ -7,7 +7,10 @@ import chat_history
 import expenses
 
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
-CORS(app) # change this to restrict endpoints later
+CORS(app, origins=[
+    "http://localhost:5500",
+    "https://meticulousbudgeting.netlify.app"
+])
 
 '''
 @app.route("/test", methods=["POST"])
