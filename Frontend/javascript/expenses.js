@@ -12,7 +12,17 @@ const fundForm = document.getElementById("fundForm");
 
 // const log = document.querySelector("#log");
 
-const API_BASE_URL = "http://localhost:5000";
+let API_BASE_URL;
+
+if (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+) {
+    API_BASE_URL = "http://localhost:5000";
+} else {
+    API_BASE_URL = "https://it391-team-2-summer-project.onrender.com";
+}
+
 console.log("Before first log")
 console.log(expenseForm)
 console.log("if")
