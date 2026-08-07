@@ -603,9 +603,12 @@ def weekly_reflection_history():
 # Generated documents: the monthly Kakeibo review and the onboarding profile.
 #
 # Both are stored as Markdown files in Supabase Storage (see reports.py), so a
-# GET is normally a file read. Only the first request of the month -- or an
-# explicit POST to regenerate -- costs a model call, which is why these sit
-# outside the chat spending guards: the storage layer already bounds them.
+# GET is normally a file read: storage bounds the GETs to one model call per
+# month, and a read that fails is reported rather than treated as "not written
+# yet", so a broken bucket cannot turn page loads into repeat generations.
+#
+# The POSTs have no such bound -- they exist to regenerate on demand -- so they
+# go through the same reserve_send guard as /chat.
 # ---------------------------------------------------------------------------
 @app.route("/monthly-report", methods=["GET"])
 def monthly_report():
@@ -633,6 +636,18 @@ def refresh_monthly_report():
         return unauthorized()
 
     data = request.get_json(silent=True) or {}
+
+    # Claimed up front, like /chat: this route calls the model every time it is
+    # reached, so nothing but the guard stands between a stuck retry loop and
+    # the bill.
+    #
+    # No release_send on the failure path. get_monthly does not report whether a
+    # failed run reached the model (only ask_coach does), and reserve_send's rule
+    # is that the doubtful case counts -- costing a user one slot is the cheaper
+    # mistake of the two.
+    limited = reserve_send(user_id)
+    if limited:
+        return limited
 
     ok, payload = reports.get_monthly(token, key=data.get("month"), refresh=True)
     if not ok:
@@ -674,14 +689,23 @@ def submit_interview():
     if not isinstance(data, dict):
         return jsonify({"success": False, "message": "Request body must be JSON."}), 400
 
+    # Same guard, and the same reasoning, as POST /monthly-report above.
+    limited = reserve_send(user_id)
+    if limited:
+        return limited
+
     ok, payload = reports.save_profile(token, data.get("transcript"))
     if not ok:
         return jsonify({"success": False, "message": payload}), 400
 
+    # The profile was written either way; `stored` says whether we managed to
+    # keep it, and the message does not claim we did when we did not.
     return jsonify({
         "success": True,
-        "message": "Profile saved.",
-        "markdown": payload
+        "message": "Profile saved." if payload["stored"] else
+                   "Here is your profile, but it could not be saved -- you may "
+                   "need to take the interview again later.",
+        "markdown": payload["markdown"]
     })
 
 

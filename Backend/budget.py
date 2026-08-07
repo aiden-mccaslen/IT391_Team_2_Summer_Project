@@ -12,7 +12,7 @@ CATEGORY_MAP = {
     "Personal": "Want",
     "Unexpected": "Want",
 
-    "Savings": "Saving" # might need to change
+    "Savings": "Savings" # must match a key of `totals` in calculate_totals
 }
 
 # expenses is the result from expenses.py's get_expenses function

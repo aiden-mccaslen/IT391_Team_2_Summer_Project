@@ -14,12 +14,20 @@ const refreshNote = document.getElementById("refreshNote");
 /* A logged-out visitor gets sent to login rather than a page of 401s. */
 auth.require();
 
+/* A single line of plain text in the body. textContent, not innerHTML: the
+ * message comes from the server and is not Markdown, so it is never markup. */
+function showMessage(text) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = text || "This month's review could not be loaded.";
+    reportBody.replaceChildren(paragraph);
+}
+
 function show(result) {
     if (!result.success) {
         // "No expenses logged yet" arrives here too. It is a real answer, not a
         // failure, so it reads as a sentence rather than an error state.
         reportSubtitle.textContent = "";
-        reportBody.innerHTML = `<p>${result.message}</p>`;
+        showMessage(result.message);
         refreshBtn.hidden = true;
         return;
     }
@@ -58,8 +66,18 @@ if (refreshBtn) {
 
         refreshBtn.disabled = false;
         refreshBtn.textContent = "Write it again";
-        refreshNote.hidden = true;
 
+        if (!result.success) {
+            // The review already on the page is still perfectly good. Replacing
+            // it with the error would lose it until a reload, so the error goes
+            // in the note under the button instead.
+            refreshNote.hidden = false;
+            refreshNote.textContent = result.message ||
+                "It could not be written again just now. Try in a moment.";
+            return;
+        }
+
+        refreshNote.hidden = true;
         show(result);
     });
 }

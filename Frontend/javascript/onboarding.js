@@ -80,6 +80,13 @@ function startInterview() {
     }
 
     startInterview();
+
+    // A profile that could not be READ is not the same as not having one. The
+    // interview is still offered, but the reason is on screen -- otherwise this
+    // looks exactly like a first visit and the user retakes it for nothing.
+    if (!result.success) {
+        showStatus(result.message);
+    }
 })();
 
 if (answerForm) {
