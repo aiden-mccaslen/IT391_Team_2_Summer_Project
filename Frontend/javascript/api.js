@@ -12,7 +12,16 @@
  * only ever handle one thing.
  */
 
-const API_BASE_URL = "http://localhost:5000"; // Flask default
+let API_BASE_URL;
+
+if (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+) {
+    API_BASE_URL = "http://localhost:5000";
+} else {
+    API_BASE_URL = "https://it391-team-2-summer-project.onrender.com";
+}
 
 const TOKEN_KEY = "mb_access_token";
 const USER_KEY = "mb_user_id";
@@ -66,7 +75,7 @@ async function request(path, { method = "GET", body = null, authed = false } = {
         }
         headers["Authorization"] = `Bearer ${token}`;
     }
-
+    
     try {
         const response = await fetch(`${API_BASE_URL}${path}`, {
             method,

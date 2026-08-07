@@ -70,18 +70,11 @@ def get_caller():
 
     return (token, status[1])
 
-
-def bearer_token():
-# The expenses/budget/fees endpoints take the raw token straight through to
-# Supabase rather than resolving a user id first.
-    return request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-
-
-def unauthorized():
-    return jsonify({
-        "success": False,
-        "message": "Not logged in. Send 'Authorization: Bearer <access_token>'."
-    }), 401
+app = Flask(__name__, static_folder="../Frontend", static_url_path="")
+CORS(app, origins=[
+    "http://localhost:5500",
+    "https://meticulousbudgeting.netlify.app"
+])
 
 '''
 @app.route("/test", methods=["POST"])
