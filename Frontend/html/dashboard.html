@@ -127,6 +127,39 @@
 
       </section>
 
+      <!-- Companion widget: a cosmetic mascot whose mood/level is a readout of
+           the same expense/budget/reflection data as the cards above -- it
+           never blocks or gates anything on this page. Ships hidden; only
+           companion.js unhides it, and only after /health/companion confirms
+           the feature is on (see Backend/companion.py). Delete companion.py,
+           its migration, this block and companion.js together and nothing
+           else on the page changes. -->
+      <article class="card" id="companionWidget" style="margin-bottom:20px" hidden>
+        <div class="card-title">
+          <h3>Your companion</h3>
+          <span class="hint-dot"
+                title="Your companion's mood reflects your recent budgeting activity. It's just for fun -- it never blocks anything.">?</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px">
+          <span id="companionSprite" style="font-size:40px; line-height:1" aria-hidden="true">&#129371;</span>
+          <div>
+            <p id="companionName" style="margin:0; font-weight:700">Your companion</p>
+            <p class="stat-sub" id="companionLevel">Level &mdash;</p>
+          </div>
+        </div>
+
+        <p class="ai-prompt on-light" id="companionDialogue">&hellip;</p>
+
+        <form id="companionNameForm">
+          <label class="visually-hidden" for="companionNameInput">Name your companion</label>
+          <input type="text" id="companionNameInput" placeholder="Give your companion a name&hellip;"
+                 autocomplete="off" maxlength="40" style="width:100%; max-width:320px">
+        </form>
+
+        <p class="stat-sub" id="companionStatus" hidden></p>
+      </article>
+
       <!-- Main Kakeibo analysis panel --------------------------------------- -->
       <section class="card" aria-labelledby="analysisHeading">
         <div class="card-title">
@@ -242,5 +275,6 @@
 
   <script src="../javascript/api.js"></script>
   <script src="../javascript/dashboard.js"></script>
+  <script src="../javascript/companion.js"></script>
 </body>
 </html>

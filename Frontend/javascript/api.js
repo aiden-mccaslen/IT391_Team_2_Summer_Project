@@ -202,4 +202,35 @@ const api = {
             body: { transcript },
         });
     },
+
+    /* The dashboard companion's current mood/level, recomputed from real
+     * expense/budget/reflection data on every call:
+     *   {success, companion: {name, mood, level, stage, streak, dialogue,
+     *                         last_interacted_at}}
+     * Purely cosmetic -- nothing else on the page depends on this call. */
+    companion() {
+        return request("/companion", { authed: true });
+    },
+
+    /* Give the companion a name. Cosmetic only, same shape as companion(). */
+    setCompanionName(name) {
+        return request("/companion/name", {
+            method: "POST",
+            authed: true,
+            body: { name },
+        });
+    },
+
+    /* No login needed. False means the companion widget is turned off
+     * server-side (COMPANION_ENABLED=false, or the module was removed), and
+     * the dashboard should render nothing for it.
+     *
+     * Fails OPEN on purpose, same as aiAvailable(): if the health check
+     * itself cannot be reached, the answer is unknown, and hiding a harmless
+     * cosmetic widget over an unanswered question is worse than trying and
+     * letting a real error surface instead. */
+    async companionAvailable() {
+        const result = await request("/health/companion");
+        return result.companion_available !== false;
+    },
 };

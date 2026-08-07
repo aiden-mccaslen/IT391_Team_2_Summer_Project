@@ -19,6 +19,17 @@ import purchase_rules
 import reflections
 import reports
 
+# The companion widget is entirely optional: nothing else in the backend
+# imports this module, so if companion.py (or its migration) is ever deleted,
+# the only thing that should notice is the companion routes themselves --
+# never the rest of the app. Guarding the import is what makes that true: an
+# un-guarded `import companion` would crash the whole process on startup the
+# moment the file was gone.
+try:
+    import companion
+except ImportError:
+    companion = None
+
 
 # All backend logging lands in Backend/logs/app.log (rotated at ~1MB so it can
 # never grow without bound). The AI layer logs the real API exceptions here;
@@ -52,6 +63,15 @@ log = logging.getLogger("kakeibo.app")
 # is not making cross-origin calls to our own API.
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app) # change this to restrict endpoints later
+
+# Off switch for the companion widget, independent of whether the module import
+# above succeeded -- COMPANION_ENABLED lets it be turned off without removing
+# the file, and `companion is None` covers the file being deleted outright.
+# Either one turns off the routes below and makes /health/companion report
+# false; every other route in this file is unaffected either way. Defaults to
+# enabled, same convention as the AI layer's own env-var checks.
+COMPANION_ENABLED = companion is not None and os.environ.get(
+    "COMPANION_ENABLED", "true").strip().lower() not in ("false", "0", "no", "off")
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +431,14 @@ def ai_health():
     # currently down" tooltip instead of letting the user type.
     return jsonify({"ai_available": kakeibo_ai.is_configured()})
 
+@app.route("/health/companion", methods=["GET"])
+def companion_health():
+    # Same shape and purpose as /health/ai: no login needed, and the frontend
+    # (see api.companionAvailable()) fails OPEN if this cannot be reached at
+    # all -- an unknown answer should not hide the widget any more than it
+    # would grey out the chat box.
+    return jsonify({"companion_available": COMPANION_ENABLED})
+
 @app.route("/logout")
 def logout():
     user_file.logout()
@@ -596,6 +624,56 @@ def weekly_reflection_history():
     return jsonify({
         "success": True,
         "reflections": payload
+    })
+
+
+# ---------------------------------------------------------------------------
+# Companion widget -- a cosmetic dashboard mascot. It only reflects data that
+# expenses/budget/reflections already own, so there is no write path here that
+# any other feature depends on; these two routes are the entire surface area.
+# ---------------------------------------------------------------------------
+@app.route("/companion", methods=["GET"])
+def get_companion():
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    ok, payload = companion.get_state(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "companion": payload
+    })
+
+
+@app.route("/companion/name", methods=["POST"])
+def set_companion_name():
+    # Body: {"name": "..."} -- purely cosmetic, so there is nothing to
+    # validate here beyond what companion.set_name already checks.
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    ok, payload = companion.set_name(token, data.get("name"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Companion name saved.",
+        "companion": payload
     })
 
 
