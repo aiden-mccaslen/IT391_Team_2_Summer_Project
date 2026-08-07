@@ -1,10 +1,5 @@
-# route logout back to signup (and add the "you have logged out popup")
-
 import logging
 import os
-import threading
-import time
-from collections import deque
 from logging.handlers import RotatingFileHandler
 
 from  flask import request, Flask, jsonify, url_for, redirect
@@ -12,11 +7,11 @@ from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
 import chat_history
+import chat_guard
 import expenses
 import budget
 import fee_monitor
 import purchase_rules
-import graphics
 
 
 # All backend logging lands in Backend/logs/app.log (rotated at ~1MB so it can
@@ -53,119 +48,7 @@ app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app) # change this to restrict endpoints later
 
 
-# ---------------------------------------------------------------------------
-# Spending guards.
-#
-# The real backstop is the hard budget limit set in the OpenAI dashboard; these
-# just stop one user (or a frontend bug stuck in a retry loop) from eating it.
-# Counters live in memory, so restarting Flask resets them -- fine at testing
-# scale, precisely because the dashboard limit is the actual ceiling.
-# ---------------------------------------------------------------------------
-COOLDOWN_MESSAGES = 10        # coach replies allowed...
-COOLDOWN_WINDOW = 30 * 60     # ...per this many seconds, per user
-
-# Roughly a dollar per user per month on gpt-4o, which is what DEFAULT_MODEL
-# falls back to -- about a tenth of that if KAKEIBO_MODEL is set to gpt-4o-mini.
-MONTHLY_MESSAGE_CAP = 100
-
 MAX_MESSAGE_CHARS = 1000      # "one paragraph"
-
-# Guarded by _spend_lock: Flask serves requests on threads, so a check in one
-# thread and a claim in another must not interleave.
-_spend_lock = threading.Lock()
-_recent_sends = {}    # user_id -> deque of timestamps of claimed replies
-_monthly_counts = {}  # user_id -> replies claimed this month
-_counts_month = None  # which "YYYY-MM" _monthly_counts is for
-
-
-def reserve_send(user_id):
-    """Check this user's limits and, if they pass, claim one slot -- atomically.
-
-    Claiming BEFORE the model call rather than counting successes after it is
-    deliberate:
-      - concurrent requests can no longer all pass the check and then spend, and
-      - failures that still cost money (a refusal, a reply truncated to nothing)
-        get counted, which is exactly the runaway case this guard exists for.
-    Failures we know were free hand the slot back via release_send().
-
-    Returns None if the send may proceed, or a ready-to-return (response, status)
-    pair if the user is on cooldown / out of monthly budget.
-    """
-    global _counts_month
-    now = time.time()
-
-    with _spend_lock:
-        this_month = time.strftime("%Y-%m")
-        if this_month != _counts_month:
-            _counts_month = this_month
-            _monthly_counts.clear()
-
-        timestamps = _recent_sends.get(user_id)
-        if timestamps is not None:
-            while timestamps and now - timestamps[0] > COOLDOWN_WINDOW:
-                timestamps.popleft()
-            if not timestamps:
-                # Drop the key instead of leaving an empty deque behind for
-                # every user the server has ever seen.
-                del _recent_sends[user_id]
-                timestamps = None
-
-        if timestamps and len(timestamps) >= COOLDOWN_MESSAGES:
-            minutes_left = int((COOLDOWN_WINDOW - (now - timestamps[0])) // 60) + 1
-            return jsonify({
-                "success": False,
-                "message": f"You've hit the message limit for now -- the coach "
-                           f"will be back in about {minutes_left} minutes."
-            }), 429
-
-        if _monthly_counts.get(user_id, 0) >= MONTHLY_MESSAGE_CAP:
-            return jsonify({
-                "success": False,
-                "message": "You've used this month's coaching messages. "
-                           "They reset at the start of next month."
-            }), 429
-
-        _recent_sends.setdefault(user_id, deque()).append(now)
-        _monthly_counts[user_id] = _monthly_counts.get(user_id, 0) + 1
-
-    return None
-
-
-def release_send(user_id):
-    """Hand back a slot claimed by reserve_send, for a turn that never cost
-    anything -- the request failed before reaching the model, or never got that
-    far at all."""
-    with _spend_lock:
-        timestamps = _recent_sends.get(user_id)
-        if timestamps:
-            timestamps.pop()
-            if not timestamps:
-                del _recent_sends[user_id]
-        if _monthly_counts.get(user_id, 0) > 0:
-            _monthly_counts[user_id] -= 1
-
-
-def rollback_turn(db, conversation_id, user_message_id, is_new_conversation):
-    """Undo the database half of a chat turn that never produced a reply.
-
-    The stored user message goes, so the frontend's retry can re-send the exact
-    same text without duplicating it in the transcript; a brand-new conversation
-    goes entirely, otherwise an empty titled chat is left in the sidebar.
-
-    Rollback failures are logged rather than raised -- the caller is already on
-    its way to returning an error, and a stale row is not worth replacing that
-    error with a different one.
-    """
-    if user_message_id is not None:
-        ok, error = chat_history.delete_message(db, user_message_id)
-        if not ok:
-            log.error("rollback of message %s failed: %s", user_message_id, error)
-
-    if is_new_conversation and conversation_id is not None:
-        ok, error = chat_history.delete_conversation(db, conversation_id)
-        if not ok:
-            log.error("rollback of conversation %s failed: %s",
-                      conversation_id, error)
 
 
 def get_caller():
@@ -290,7 +173,7 @@ def chat():
 
     # Claims the slot up front -- every early return below hands it back, since
     # none of them reached the model.
-    limited = reserve_send(user_id)
+    limited = chat_guard.reserve_send(user_id)
     if limited:
         return limited
 
@@ -305,21 +188,21 @@ def chat():
         # is indistinguishable from one that does not exist -- both are "not found".
         status = chat_history.get_conversation(db, conversation_id)
         if not status[0]:
-            release_send(user_id)
+            chat_guard.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 404
         conversation = status[1]
     else:
         status = chat_history.create_conversation(db, user_id, message)
         if not status[0]:
-            release_send(user_id)
+            chat_guard.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 500
         conversation = status[1]
         conversation_id = conversation["id"]
 
     status = chat_history.add_message(db, conversation_id, "user", message)
     if not status[0]:
-        release_send(user_id)
-        rollback_turn(db, conversation_id, None, is_new_conversation)
+        chat_guard.release_send(user_id)
+        chat_guard.rollback_turn(db, conversation_id, None, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     user_message_id = status[1]["id"]
 
@@ -327,8 +210,8 @@ def chat():
     # recent window of it, straight from the database.
     status = chat_history.get_recent_messages(db, conversation_id)
     if not status[0]:
-        release_send(user_id)
-        rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+        chat_guard.release_send(user_id)
+        chat_guard.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     history = status[1]
 
@@ -340,8 +223,8 @@ def chat():
     # and whether the attempt actually cost money.
     if not ok:
         if not billed:
-            release_send(user_id)
-        rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+            chat_guard.release_send(user_id)
+        chat_guard.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": payload}), 502
     reply = payload
 
@@ -414,13 +297,8 @@ def ai_health():
 def logout():
     user_file.logout()
 
-
-# ---------------------------------------------------------------------------
-# Expenses, budget, fees and purchase rules.
-# ---------------------------------------------------------------------------
 @app.route("/expenses", methods=["POST"])
 def expense():
-    print("expense routed")
     data = request.get_json()
     access_token = bearer_token()
 
@@ -428,14 +306,11 @@ def expense():
         amount = data["amount"]
         purchase_date = data["purchase_date"]
         category = data["category"]
-        print(access_token)
         status = expenses.report_expense(access_token, amount, purchase_date, category)
     else:
-        print("debug 1")
         amount = data["amount"]
         account = data["account"]
         status = expenses.report_fund(access_token, amount, account)
-        print("debug 2")
 
     return jsonify ({
         "success": status[0],
@@ -549,22 +424,10 @@ def evaluate_purchase():
     })
 
 
-@app.route("/graphics", methods=["GET"])
-def expenseGraph():
-    # Get the graph DATA here. We will plot in expenses.js, just return the data JSONified.
-    access_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-    status = graphics.getGraphData(access_token)
-
-    if status[0]:
-        print("good")
-        return jsonify({
-            "success": True,
-            "data": status[1]
-        })
-    return jsonify({
-        "success": False,
-        "message": status[1]
-    })
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Backend/logs/app.log sits inside the tree the debug reloader watches, and
+    # every request writes a line to it (Werkzeug's own access log propagates to
+    # the root handler above) -- without this exclusion, every request's log
+    # write triggers a reload, which drops in-flight requests and looks to the
+    # browser like the page never finishes loading.
+    app.run(debug=True, exclude_patterns=["*/logs/*"])

@@ -35,6 +35,11 @@ function clearMessage() {
     }
 }
 
+// Logging out redirects here with ?loggedOut=1
+if (new URLSearchParams(window.location.search).get("loggedOut")) {
+    showMessage("You have signed out.", "success");
+}
+
 function setBusy(form, busy, label) {
     const button = form.querySelector("button[type=submit]");
     if (!button) {

@@ -1,4 +1,4 @@
-# Program AI generated to create random purchases to have data in an account for testing
+# Program that AI generated to create random purchases to have data in an account for testing
 
 import random
 from datetime import date, timedelta

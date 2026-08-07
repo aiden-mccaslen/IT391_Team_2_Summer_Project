@@ -1,52 +1,61 @@
-/* Colors */
-:root {
-    /* 
-    Note to self:
-    --colorName: #FFFFFF; 
-    somethingColor: var(--colorName);
-    */
-    --temp: #FFFFFF;
+.expense-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding-bottom: 48px;
 }
 
-main {
-    justify-content: center;
-    flex-direction: column;
-    display: flex;
-    padding: 4px;
-    max-height: 5vh;
+@media (max-width: 940px) {
+    .expense-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
-.expenses_welcome {
-    justify-content: center;
-    flex-direction: column;
+.radio-fieldset {
+    margin-top: 16px;
+    padding: 0;
+    border: none;
+}
+
+.radio-fieldset legend {
+    padding: 0;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.radio-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.radio-option {
     display: flex;
     align-items: center;
-    padding: 40px;
-    min-height: 5vh;
-}
-fieldset {
-    border: 0;
-}
-
-form {
-    display: flex;
-    flex-direction: column;
-    width: 420px;
-    max-width: 100%;
-    padding: 32px;
-    border-radius: 20px;
-    background-color: var(--card-color);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-}
-
-input[type=submit] {
-    margin-top: 12px;
-    padding: 12px;
-    background-color: #6C63FF;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: bold;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
     cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.radio-option:hover {
+    background-color: var(--surface-sunken);
+}
+
+.radio-option:has(input:checked) {
+    border-color: var(--purple-600);
+    background-color: var(--purple-100);
+}
+
+.radio-option input {
+    margin: 0;
+    accent-color: var(--purple-700);
 }
