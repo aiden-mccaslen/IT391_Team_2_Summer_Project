@@ -87,7 +87,7 @@ def _recent_context(access_token, caller=None):
             log.info("reflection context: could not read expenses: %s", expenses_data)
             expenses_data = []
 
-        ok, funds_data = expenses.get_funds(access_token)
+        ok, funds_data = expenses.get_balance(access_token)
         if not ok:
             log.info("reflection context: could not read funds: %s", funds_data)
             funds_data = []

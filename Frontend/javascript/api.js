@@ -12,7 +12,16 @@
  * only ever handle one thing.
  */
 
-const API_BASE_URL = "http://localhost:5000"; // Flask default
+let API_BASE_URL;
+
+if (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+) {
+    API_BASE_URL = "http://localhost:5000";
+} else {
+    API_BASE_URL = "https://it391-team-2-summer-project.onrender.com";
+}
 
 const TOKEN_KEY = "mb_access_token";
 const USER_KEY = "mb_user_id";
@@ -152,6 +161,26 @@ const api = {
 
     messages(conversationId) {
         return request(`/conversations/${conversationId}/messages`, { authed: true });
+    },
+
+
+    /* POST /expenses tells an expense from a fund/credit entry by shape --
+     * amount+purchase_date+category vs amount+account -- so these stay as two
+     * named calls rather than one generic passthrough. */
+    addExpense(amount, purchaseDate, category) {
+        return request("/expenses", {
+            method: "POST",
+            authed: true,
+            body: { amount, purchase_date: purchaseDate, category },
+        });
+    },
+
+    addFund(amount, account) {
+        return request("/expenses", {
+            method: "POST",
+            authed: true,
+            body: { amount, account },
+        });
     },
 
     /* No login needed. False means the coach is misconfigured server-side, and

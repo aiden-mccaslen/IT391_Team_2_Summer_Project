@@ -12,7 +12,7 @@ CATEGORY_MAP = {
     "Personal": "Want",
     "Unexpected": "Want",
 
-    "Savings": "Savings" # must match a key of `totals` in calculate_totals
+    "Savings": "Saving" # might need to change
 }
 
 # expenses is the result from expenses.py's get_expenses function
@@ -40,7 +40,7 @@ def calculate_totals(expenses):
     return totals
 
 # expenses is the result from expenses.py's get_expenses function
-# income is the result from expenses.py's get_funds function
+# income is the result from expenses.py's get_balance function
 def calculate_budget(income, expenses):
     """
     Calculates spending totals and percentages for the 50/30/20 rule.
@@ -65,7 +65,7 @@ def calculate_budget(income, expenses):
 
         "NeedPercent": round((totals["Need"] / income) * 100, 2),
         "WantPercent": round((totals["Want"] / income) * 100, 2),
-        "SavingsPercent": round((totals["Savings"] / income) * 100, 2)
+        "SavingsPercent": round((totals["Savings"] / income) * 100, 2) # We might want to check that the income is > 0
     }
 
 def evaluate_budget(summary):
@@ -88,3 +88,4 @@ def evaluate_budget(summary):
         )
 
     return warnings
+

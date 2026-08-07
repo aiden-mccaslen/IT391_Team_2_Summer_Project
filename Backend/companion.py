@@ -177,7 +177,7 @@ def _signals(access_token):
                            if e.get("purchase_date")]
         streak_days = compute_activity_streak(purchase_dates)
 
-        ok, funds_data = expenses.get_funds(access_token)
+        ok, funds_data = expenses.get_balance(access_token)
         if not ok:
             log.info("companion signals: could not read funds: %s", funds_data)
             funds_data = []

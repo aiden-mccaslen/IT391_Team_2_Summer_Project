@@ -12,15 +12,8 @@ supabase_client: Client = create_client(url, key)
 # through Row Level Security, but every table query below must use the per-user
 # client from user.client_for_token() instead -- see the note in that function.
 # An anonymous client has no auth.uid(), so RLS rejects the insert outright.
-'''
-Made account non-nullable in database
-made user_id unique so it has to be updated to reflect current balance
-'''
 
 def report_expense(access_token, amount, purchase_date, category):
-    # caller_client gives us the user's id plus a client that acts as them, so the
-    # Row Level Security policy on each table sees an auth.uid() and lets the row
-    # through. The shared anonymous client above cannot do that.
     uuid, db = user_file.caller_client(access_token)
     if uuid is None:
         return (False, db)
@@ -32,7 +25,7 @@ def report_expense(access_token, amount, purchase_date, category):
                 "user_id": uuid,
                 "amount": amount,
                 "purchase_date": purchase_date,
-                "category": category
+                "category": category 
                 }
             ]).execute()
         )
@@ -47,6 +40,7 @@ def get_expenses(access_token): #gets expenses form supabase
         return (False, db)
 
     try:
+
         response = (
             db.table("expenses")
             .select("*")
@@ -58,20 +52,21 @@ def get_expenses(access_token): #gets expenses form supabase
 
     except Exception as e:
         return (False, str(e))
-
-def report_fund(access_token, amount, account): # can't have checking and saving (need to talk about this)
+    
+def report_fund(access_token, amount, account): 
     uuid, db = user_file.caller_client(access_token)
     if uuid is None:
         return (False, db)
 
     try:
+
         response = (
             db.table("funds")
             .upsert({
                 "user_id": uuid,
                 "amount": amount,
                 "account": account
-            }, on_conflict="user_id")
+            }, on_conflict="user_id,account") 
             .execute()
         )
         return (True, response.data)
@@ -79,12 +74,13 @@ def report_fund(access_token, amount, account): # can't have checking and saving
     except Exception as e:
         return (False, str(e))
 
-def get_funds(access_token): # gets income form supabase
+def get_balance(access_token): # gets income form supabase
     uuid, db = user_file.caller_client(access_token)
     if uuid is None:
         return (False, db)
 
     try:
+
         response = (
             db.table("funds")
             .select("*")
@@ -96,3 +92,14 @@ def get_funds(access_token): # gets income form supabase
 
     except Exception as e:
         return (False, str(e))
+
+def _split_funds(funds_data):
+# funds_data holds one row per account ("checking", "savings")
+    checking = 0.0
+    savings = 0.0
+    for fund in funds_data:
+        if fund["account"] == "checking":
+            checking = float(fund["amount"])
+        elif fund["account"] == "savings":
+            savings = float(fund["amount"])
+    return checking, savings

@@ -13,7 +13,7 @@
   <header class="app-header">
     <div class="wrap">
       <a class="brand" href="dashboard.html">
-        <span class="brand-mark" aria-hidden="true">$</span>
+        <span class="brand-mark" aria-hidden="true">&#165;</span>
         <span>Meticulous Budgeting</span>
       </a>
 
@@ -22,6 +22,23 @@
         <a href="expenses.html">Expenses</a>
         <a href="monthly.html">Monthly review</a>
         <a href="chat.html" aria-current="page">Coach</a>
+
+        <div class="profile">
+          <button class="avatar-btn" id="avatarBtn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+            <span id="avatarInitials" aria-hidden="true">&#183;&#183;</span>
+            <span class="visually-hidden">Open profile menu</span>
+          </button>
+
+          <div class="profile-menu" id="profileMenu" hidden>
+            <a href="profile.html">Profile</a>
+            <a href="profile.html#settings">Settings</a>
+            <a href="profile.html#notifications">Notifications</a>
+            <!-- The only upgrade cue in the app. Nothing on this page is gated. -->
+            <a class="menu-premium" href="profile.html#premium">Premium &#9733;</a>
+            <a href="login.html" id="logoutLink">Log out</a>
+          </div>
+        </div>
       </nav>
     </div>
   </header>
@@ -109,6 +126,7 @@
   </main>
 
   <script src="../javascript/api.js"></script>
+  <script src="../javascript/profile-menu.js"></script>
   <script src="../javascript/chat.js"></script>
 </body>
 </html>
