@@ -54,7 +54,8 @@ if (expenseForm) {
         };
         // testing
         console.log("Expense Data: ", expenseData);
-        console.log("before call")
+
+        const result = api.expenses(JSON.jsonify(expenseData));
         sendExpenseRequest(expenseData);
     });
     console.log("after event listener")
