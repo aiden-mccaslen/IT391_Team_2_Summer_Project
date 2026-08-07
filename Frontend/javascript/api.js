@@ -137,6 +137,11 @@ const api = {
         return request(`/conversations/${conversationId}/messages`, { authed: true });
     },
 
+
+    expenses() {
+        return request("/expenses", { method: "POST", authed: true }); // update this; this is where it needs to post.
+    },
+
     /* No login needed. False means the coach is misconfigured server-side, and
      * the chat UI greys itself out instead of letting the user type into a void.
      *

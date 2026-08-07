@@ -3,7 +3,11 @@ const expenseForm = document.getElementById("expenseForm");
 console.log("before fundform")
 const fundForm = document.getElementById("fundForm");
 
-const API_BASE_URL = "http://localhost:5000";
+if (typeof api === "undefined") {
+    console.error("script.js needs api.js -- add <script src=\"../javascript/api.js\"></script> before it.");
+}
+
+// const API_BASE_URL = "http://localhost:5000";
 console.log("Before first log")
 console.log(expenseForm)
 console.log("if")
