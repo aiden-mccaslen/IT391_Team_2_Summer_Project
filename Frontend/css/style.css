@@ -693,6 +693,21 @@ textarea:focus {
 
 .ai-prompt strong { display: block; margin-bottom: 4px; font-size: 12px; }
 
+/* The same block on a light surface -- the onboarding interview card. The base
+ * .ai-prompt is built for the dashboard's purple card (white text on translucent
+ * white), which is invisible on a white card. */
+.ai-prompt.on-light {
+    background: var(--surface-sunken);
+    color: var(--ink);
+    font-size: 15px;
+}
+
+.ai-prompt.on-light strong {
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .card-reflection input {
     width: 100%;
     background: rgba(255, 255, 255, 0.94);
@@ -1168,6 +1183,56 @@ textarea:focus {
     .dock-label span:last-child { display: none; }
 
     .bars, .bar-labels { gap: 14px; }
+}
+
+/* Rendered Markdown -----------------------------------------------------------
+ * The monthly review and the profile arrive as Markdown and are turned into
+ * plain h1/h2/ul/p by markdown.js. These rules give that generated markup the
+ * same rhythm as the rest of the app; without them the headings sit flush
+ * against the paragraph above and the document reads as one block.
+ * --------------------------------------------------------------------------- */
+.report-body h1,
+.report-body h2,
+.report-body h3 {
+    margin: 28px 0 8px;
+}
+
+.report-body h1:first-child,
+.report-body h2:first-child {
+    margin-top: 0;
+}
+
+/* A document's own title sits inside a card, not at the top of the page, so it
+ * should not compete with the page heading above it. */
+.report-body h1 {
+    font-size: 24px;
+}
+
+.report-body h2 {
+    font-size: 20px;
+}
+
+.report-body h3 {
+    font-size: 17px;
+}
+
+.report-body p {
+    margin: 0 0 12px;
+}
+
+.report-body ul {
+    margin: 0 0 16px;
+    padding-left: 22px;
+}
+
+.report-body li {
+    margin-bottom: 6px;
+}
+
+.report-body hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 24px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

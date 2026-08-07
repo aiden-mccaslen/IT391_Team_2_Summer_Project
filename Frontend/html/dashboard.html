@@ -25,6 +25,7 @@
       <nav class="site-nav" aria-label="Main">
         <a href="dashboard.html" aria-current="page">Dashboard</a>
         <a href="expenses.html">Expenses</a>
+        <a href="monthly.html">Monthly review</a>
         <a href="savings.html">Savings</a>
         <a href="chat.html">Coach</a>
 
@@ -72,9 +73,11 @@
             <span class="hint-dot" title="Your coach asks one short question each week.">?</span>
           </div>
 
+          <!-- The question comes from GET /weekly-reflection; this is only what
+               shows while that is in flight. -->
           <p class="ai-prompt">
             <strong>AI guide</strong>
-            "What purchase brought you the most joy this week, and why?"
+            <span id="reflectionQuestion">Loading this week's question&hellip;</span>
           </p>
 
           <form id="reflectionForm">
@@ -82,6 +85,8 @@
             <input type="text" id="reflectionInput" placeholder="Type your answer&hellip;"
                    autocomplete="off">
           </form>
+
+          <p class="stat-sub" id="reflectionStatus" hidden></p>
         </article>
 
         <!-- Spend to date. There is no historical series behind /budget yet, so

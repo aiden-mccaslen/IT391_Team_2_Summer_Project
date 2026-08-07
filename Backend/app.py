@@ -16,6 +16,8 @@ import expenses
 import budget
 import fee_monitor
 import purchase_rules
+import reflections
+import reports
 
 
 # All backend logging lands in Backend/logs/app.log (rotated at ~1MB so it can
@@ -530,6 +532,156 @@ def evaluate_purchase():
     return jsonify({
     "success": True,
     "result": result
+    })
+
+
+# ---------------------------------------------------------------------------
+# Weekly reflection -- the dashboard card.
+#
+# The question is generated once per user per week and then stored, so the model
+# call happens on the first load of the week and every load after that is a plain
+# database read. That is what keeps this feature off the spending guards above:
+# there is no way to make it call the model more than once a week per user.
+# ---------------------------------------------------------------------------
+@app.route("/weekly-reflection", methods=["GET"])
+def weekly_reflection():
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    ok, payload = reflections.get_current(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "reflection": payload
+    })
+
+
+@app.route("/weekly-reflection", methods=["POST"])
+def save_weekly_reflection():
+    # Body: {"answer": "..."} -- answering again in the same week overwrites,
+    # rather than stacking up rows the card could not show anyway.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    ok, payload = reflections.save_answer(token, data.get("answer"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Reflection saved.",
+        "reflection": payload
+    })
+
+
+@app.route("/weekly-reflection/history", methods=["GET"])
+def weekly_reflection_history():
+    # Past weeks the user actually answered, newest first.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    ok, payload = reflections.list_history(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "reflections": payload
+    })
+
+
+# ---------------------------------------------------------------------------
+# Generated documents: the monthly Kakeibo review and the onboarding profile.
+#
+# Both are stored as Markdown files in Supabase Storage (see reports.py), so a
+# GET is normally a file read. Only the first request of the month -- or an
+# explicit POST to regenerate -- costs a model call, which is why these sit
+# outside the chat spending guards: the storage layer already bounds them.
+# ---------------------------------------------------------------------------
+@app.route("/monthly-report", methods=["GET"])
+def monthly_report():
+    # ?month=YYYY-MM to look back at an earlier month; defaults to this one.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    ok, payload = reports.get_monthly(token, key=request.args.get("month"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "report": payload
+    })
+
+
+@app.route("/monthly-report", methods=["POST"])
+def refresh_monthly_report():
+    # Regenerate and overwrite. Separate from GET on purpose: rewriting the
+    # month's review costs money, so it should never happen from a page load.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    data = request.get_json(silent=True) or {}
+
+    ok, payload = reports.get_monthly(token, key=data.get("month"), refresh=True)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "report": payload
+    })
+
+
+@app.route("/profile", methods=["GET"])
+def get_profile():
+    # markdown is null when the user has not done the interview yet -- that is a
+    # normal state, not an error, and the frontend shows the interview instead.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    ok, payload = reports.get_profile(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "markdown": payload
+    })
+
+
+@app.route("/profile/interview", methods=["POST"])
+def submit_interview():
+    # Body: {"transcript": "..."} or {"transcript": ["Q: ...", "A: ...", ...]}
+    # Re-running the interview replaces the stored profile.
+    token, user_id = get_caller()
+    if token is None:
+        return unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    ok, payload = reports.save_profile(token, data.get("transcript"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Profile saved.",
+        "markdown": payload
     })
 
 

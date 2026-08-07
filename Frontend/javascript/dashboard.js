@@ -85,12 +85,65 @@ if (dockForm) {
     });
 }
 
-/* The weekly reflection card is a UI stub until there is somewhere to store
-   the answer. Say so rather than silently dropping what the user typed. */
+/* Weekly reflection ------------------------------------------------------
+ * One coach question per week from GET /weekly-reflection, and the answer goes
+ * back with POST. Submitting is Enter in the input -- the card has no button.
+ * ------------------------------------------------------------------------- */
+const reflectionInput = document.getElementById("reflectionInput");
+const reflectionQuestion = document.getElementById("reflectionQuestion");
+const reflectionStatus = document.getElementById("reflectionStatus");
+
+function showReflectionStatus(text) {
+    if (reflectionStatus) {
+        reflectionStatus.textContent = text;
+        reflectionStatus.hidden = !text;
+    }
+}
+
 if (reflectionForm) {
-    reflectionForm.addEventListener("submit", function (event) {
+    (async function loadReflection() {
+        const result = await api.weeklyReflection();
+
+        if (!result.success) {
+            if (reflectionQuestion) {
+                reflectionQuestion.textContent =
+                    "This week's question could not be loaded.";
+            }
+            reflectionInput.disabled = true;
+            showReflectionStatus(result.message);
+            return;
+        }
+
+        const reflection = result.reflection || {};
+        if (reflectionQuestion && reflection.question) {
+            reflectionQuestion.textContent = `"${reflection.question}"`;
+        }
+
+        // Coming back later in the same week shows what was written, editable --
+        // saving again replaces it.
+        if (reflection.answer) {
+            reflectionInput.value = reflection.answer;
+            showReflectionStatus("Saved. Press Enter to update it.");
+        }
+    })();
+
+    reflectionForm.addEventListener("submit", async function (event) {
         event.preventDefault();
-        alert("Saving weekly reflections is not wired up yet.");
+
+        const answer = reflectionInput.value.trim();
+        if (!answer) {
+            return;
+        }
+
+        reflectionInput.disabled = true;
+        showReflectionStatus("Saving…");
+
+        const result = await api.saveWeeklyReflection(answer);
+
+        reflectionInput.disabled = false;
+        showReflectionStatus(result.success
+            ? "Saved. Press Enter to update it."
+            : result.message);
     });
 }
 
