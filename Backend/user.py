@@ -101,3 +101,16 @@ def client_for_token(token):
         key,
         options=ClientOptions(headers={"Authorization": f"Bearer {token}"}),
     )
+
+def caller_client(token):
+# The two steps every expenses/fees function needs, in one call: work out who is
+# asking, and build a client that talks to the database AS them.
+#
+# Returns (uuid, client) once the token checks out, or (None, error_message) if it
+# does not -- so callers can hand the error straight back instead of blowing up on
+# a None user, which is what the endpoints used to do when no token was sent.
+    ok, result = get_user_id(token)
+    if not ok:
+        return (None, result)
+
+    return (result, client_for_token(token))
