@@ -47,11 +47,15 @@
     --series-wants: #A265D8;
     --series-savings: #D4A017;
 
-    /* State. Deliberately NOT red-as-brand: overspending gets a calm amber,
-       never an alarm, because the app never shames the user. */
+    /* State */
     --success: #2E7D5B;
     --notice: #8A6A12;
     --error: #B3261E;
+
+    /* Tinted backgrounds for the two states above */
+    --success-bg: #E9F5EF;
+    --error-bg: #FCEEED;
+    --error-border: #F3D6D3;
 
     /* Shape + depth ------------------------------------------------------ */
     --r-sm: 8px;
@@ -78,6 +82,66 @@
     --border-color: var(--line);
     --error-color: var(--error);
     --success-color: var(--success);
+}
+
+
+/* ==========================================================================
+   Dark mode
+   --------------------------------------------------------------------------
+   Set by theme.js via [data-theme] on <html> (not a prefers-color-scheme
+   media query -- the toggle on the profile page has to be able to override
+   the OS setting, and a single JS-driven source of truth is simpler than
+   keeping a media-query path and an attribute path in sync).
+
+   Brand hues (purple/gold/vermilion/series) stay the same in both themes --
+   they're already saturated enough to read on a dark surface, and keeping
+   them fixed means buttons and charts look identical either way. Only the
+   neutrals (surfaces, ink, lines) and the two state backgrounds flip.
+   ========================================================================== */
+:root[data-theme="dark"] {
+    --bg: #17121F;
+    --bg-cream: #1C1620;
+    --surface: #241C30;
+    --surface-sunken: #1D1626;
+
+    --ink: #F2EEF8;
+    --ink-soft: #C4BCD4;
+    --ink-faint: #8D84A0;
+
+    --line: #382C48;
+    --line-strong: #4C3D61;
+
+    /* Dark-surface-safe versions of the status colors -- the light versions
+       are deliberately muted, which reads as low-contrast-to-invisible on a
+       dark background. */
+    --success: #5BC490;
+    --notice: #816203;
+    --error: #E5776A;
+
+    --success-bg: #1E3327;
+    --error-bg: #3A211E;
+    --error-border: #5C332E;
+
+    /* Legacy aliases (see the block above) need to follow --ink/--surface. */
+    --background-color: var(--bg);
+    --card-color: var(--surface);
+    --text-color: var(--ink);
+    --secondary-text-color: var(--ink-soft);
+    --border-color: var(--line);
+    --error-color: var(--error);
+    --success-color: var(--success);
+}
+
+/* --purple-700 is used both as a button *background* (white text on top --
+   fine on any page background) and as plain link/badge *text* (not fine on a
+   dark page background -- #5A2185 on near-black is a contrast failure). Only
+   the text uses get overridden here; button/gradient uses are untouched. */
+:root[data-theme="dark"] a {
+    color: var(--purple-400);
+}
+
+:root[data-theme="dark"] .badge-free {
+    color: var(--purple-400);
 }
 
 
@@ -378,14 +442,74 @@ textarea:focus {
 
 .form-message.is-error {
     display: block;
-    background: #FCEEED;
+    background: var(--error-bg);
     color: var(--error);
 }
 
 .form-message.is-success {
     display: block;
-    background: #E9F5EF;
+    background: var(--success-bg);
     color: var(--success);
+}
+
+/* Toggle switch -- boolean settings (dark mode, etc). A real checkbox
+   underneath keeps it keyboard- and screen-reader-operable; the track/thumb
+   are just its visual skin. */
+.switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    width: fit-content;
+}
+
+.switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    border: 0;
+}
+
+.switch-track {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex: none;
+    border-radius: var(--r-pill);
+    background: var(--line-strong);
+    transition: background-color 0.15s ease;
+}
+
+.switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease;
+}
+
+.switch input:checked ~ .switch-track {
+    background: var(--purple-700);
+}
+
+.switch input:checked ~ .switch-track .switch-thumb {
+    transform: translateX(18px);
+}
+
+.switch input:focus-visible ~ .switch-track {
+    outline: 3px solid var(--purple-400);
+    outline-offset: 2px;
 }
 
 
@@ -1025,8 +1149,8 @@ textarea:focus {
 .chat-message.is-error {
     align-self: center;
     max-width: 100%;
-    background: #FCEEED;
-    border: 1px solid #F3D6D3;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
     color: var(--error);
     font-size: 13px;
     text-align: center;
@@ -1078,6 +1202,11 @@ textarea:focus {
 .meter-fill.needs   { background: var(--series-needs); }
 .meter-fill.wants   { background: var(--series-wants); }
 .meter-fill.savings { background: var(--series-savings); }
+
+/* Companion stats -- deliberately different hues from the budget meters
+   above so the two concepts never look like the same kind of bar. */
+.meter-fill.happiness { background: var(--gold-400); }
+.meter-fill.hunger    { background: var(--purple-600); }
 
 /* Docked chatbot bar (dashboard) ----------------------------------------- */
 .chat-dock {
@@ -1142,6 +1271,66 @@ textarea:focus {
 
 
 /* ==========================================================================
+   Expenses
+   ========================================================================== */
+.expense-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding-bottom: 48px;
+}
+
+.radio-fieldset {
+    margin-top: 16px;
+    padding: 0;
+    border: none;
+}
+
+.radio-fieldset legend {
+    padding: 0;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.radio-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.radio-option:hover {
+    background-color: var(--surface-sunken);
+}
+
+.radio-option:has(input:checked) {
+    border-color: var(--purple-600);
+    background-color: var(--purple-100);
+}
+
+.radio-option input {
+    margin: 0;
+    accent-color: var(--purple-700);
+}
+
+
+/* ==========================================================================
    Badges
    ========================================================================== */
 .badge {
@@ -1166,7 +1355,8 @@ textarea:focus {
     .hero,
     .onboarding-grid,
     .dash-analysis,
-    .chat-layout {
+    .chat-layout,
+    .expense-layout {
         grid-template-columns: 1fr;
         gap: 32px;
     }

@@ -1,3 +1,21 @@
+"""Request-level guards shared across routes: who is calling (auth headers),
+and how much they're allowed to spend on the AI coach right now.
+
+Kept out of app.py so that file stays a thin Flask routing layer.
+"""
+
+import logging
+import threading
+import time
+from collections import deque
+
+from flask import jsonify, request
+
+import chat_history
+import user as user_file
+
+log = logging.getLogger("kakeibo.limit")
+
 # ---------------------------------------------------------------------------
 # Spending guards.
 #
@@ -114,11 +132,11 @@ def rollback_turn(db, conversation_id, user_message_id, is_new_conversation):
 
 
 def get_caller():
-# Every chat/history endpoint starts the same way: who is this?
-# The frontend sends the access token it got from /login as
-#     Authorization: Bearer <token>
-# Returns (token, user_id), or (None, None) if the header is missing or the token
-# is not valid -- the endpoint turns that into a 401.
+    # Every chat/history endpoint starts the same way: who is this?
+    # The frontend sends the access token it got from /login as
+    #     Authorization: Bearer <token>
+    # Returns (token, user_id), or (None, None) if the header is missing or the
+    # token is not valid -- the endpoint turns that into a 401.
     header = request.headers.get("Authorization", "")
     if not header.startswith("Bearer "):
         return (None, None)
@@ -134,8 +152,8 @@ def get_caller():
 
 
 def bearer_token():
-# The expenses/budget/fees endpoints take the raw token straight through to
-# Supabase rather than resolving a user id first.
+    # The expenses/budget/fees endpoints take the raw token straight through to
+    # Supabase rather than resolving a user id first.
     return request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
 
 

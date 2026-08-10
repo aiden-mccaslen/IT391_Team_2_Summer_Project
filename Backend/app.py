@@ -7,7 +7,7 @@ from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
 import chat_history
-import chat_guard
+import limit
 import expenses
 import budget
 import fee_monitor
@@ -74,40 +74,6 @@ COMPANION_ENABLED = companion is not None and os.environ.get(
 
 
 
-MAX_MESSAGE_CHARS = 1000      # "one paragraph"
-
-def get_caller():
-# Every chat/history endpoint starts the same way: who is this?
-# The frontend sends the access token it got from /login as
-#     Authorization: Bearer <token>
-# Returns (token, user_id), or (None, None) if the header is missing or the token
-# is not valid -- the endpoint turns that into a 401.
-    header = request.headers.get("Authorization", "")
-    if not header.startswith("Bearer "):
-        return (None, None)
-
-    token = header[len("Bearer "):].strip()
-    status = user_file.get_user_id(token)
-    # status returns a tuple (true or false depending on whether the token is good,
-    # the user id or an error message)
-    if not status[0]:
-        return (None, None)
-
-    return (token, status[1])
-
-
-def bearer_token():
-# The expenses/budget/fees endpoints take the raw token straight through to
-# Supabase rather than resolving a user id first.
-    return request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-
-
-def unauthorized():
-    return jsonify({
-        "success": False,
-        "message": "Not logged in. Send 'Authorization: Bearer <access_token>'."
-    }), 401
-
 '''
 @app.route("/test", methods=["POST"])
 # /test is an endpoint in flask e.g https://5500/test and "/" is the deafult page e.g https://5500
@@ -169,9 +135,9 @@ def chat():
     # it back to us. It sends ONE message plus the id of the chat it belongs to
     # (or null to start a new chat), and we load the history out of Supabase:
     #     {"conversation_id": "<uuid>" or null, "message": "..."}
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     # silent=True: malformed JSON gives us None instead of Flask's HTML error
     # page, so the frontend always gets our {"success": false} shape back.
@@ -181,6 +147,10 @@ def chat():
 
     message = (data.get("message") or "").strip()
     conversation_id = data.get("conversation_id") # null on the first message of a new chat
+    # Sent by the dashboard companion widget only (see companion.js) -- swaps
+    # in kakeibo_ai.COMPANION_SYSTEM below instead of the coach persona.
+    is_companion_chat = bool(data.get("companion"))
+    companion_name = (data.get("companion_name") or "").strip()
 
     if not message:
         return jsonify({"success": False, "message": "Message is empty."}), 400
@@ -189,16 +159,16 @@ def chat():
     # anyone pasting a document in -- we would pay to resend it on every one of
     # the next 30 turns while it sits in the replay window.
     message = " ".join(message.split())
-    if len(message) > MAX_MESSAGE_CHARS:
+    if len(message) > limit.MAX_MESSAGE_CHARS:
         return jsonify({
             "success": False,
             "message": f"Please keep messages to one paragraph "
-                       f"(under {MAX_MESSAGE_CHARS} characters)."
+                       f"(under {limit.MAX_MESSAGE_CHARS} characters)."
         }), 400
 
     # Claims the slot up front -- every early return below hands it back, since
     # none of them reached the model.
-    limited = chat_guard.reserve_send(user_id)
+    limited = limit.reserve_send(user_id)
     if limited:
         return limited
 
@@ -213,21 +183,21 @@ def chat():
         # is indistinguishable from one that does not exist -- both are "not found".
         status = chat_history.get_conversation(db, conversation_id)
         if not status[0]:
-            chat_guard.release_send(user_id)
+            limit.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 404
         conversation = status[1]
     else:
         status = chat_history.create_conversation(db, user_id, message)
         if not status[0]:
-            chat_guard.release_send(user_id)
+            limit.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 500
         conversation = status[1]
         conversation_id = conversation["id"]
 
     status = chat_history.add_message(db, conversation_id, "user", message)
     if not status[0]:
-        chat_guard.release_send(user_id)
-        chat_guard.rollback_turn(db, conversation_id, None, is_new_conversation)
+        limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, None, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     user_message_id = status[1]["id"]
 
@@ -235,23 +205,40 @@ def chat():
     # recent window of it, straight from the database.
     status = chat_history.get_recent_messages(db, conversation_id)
     if not status[0]:
-        chat_guard.release_send(user_id)
-        chat_guard.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+        limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     history = status[1]
 
     # Anything older than that window lives on as the rolling summary, which the
     # coach reads as context. It is None until the chat gets long (see chat_history).
+    user_context = conversation.get("summary")
+    persona = None
+    if is_companion_chat:
+        persona = kakeibo_ai.COMPANION_SYSTEM
+        if companion_name:
+            name_line = f'Your name (as the companion) is "{companion_name}".'
+            user_context = f"{name_line}\n{user_context}" if user_context else name_line
+
     ok, payload, billed = kakeibo_ai.ask_coach(
-        history, user_context=conversation.get("summary"))
+        history, user_context=user_context, system=persona)
     # ask_coach returns three parts: success, the reply text or an error message,
     # and whether the attempt actually cost money.
     if not ok:
         if not billed:
-            chat_guard.release_send(user_id)
-        chat_guard.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+            limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": payload}), 502
     reply = payload
+
+    # Chatting with the coach is the companion's "feed/play with it" action --
+    # see companion.py's module docstring. Best-effort: a working chat reply
+    # must never turn into a failed request just because this could not.
+    if companion is not None and COMPANION_ENABLED:
+        try:
+            companion.record_chat_interaction(token)
+        except Exception:
+            log.exception("companion interaction failed for %s", user_id)
 
     status = chat_history.add_message(db, conversation_id, "assistant", reply)
     if not status[0]:
@@ -272,9 +259,9 @@ def chat():
 @app.route("/conversations", methods=["GET"])
 def conversations():
     # The chat sidebar: every chat this user has, newest first.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     db = user_file.client_for_token(token)
     status = chat_history.list_conversations(db, user_id)
@@ -289,9 +276,9 @@ def conversations():
 @app.route("/conversations/<conversation_id>/messages", methods=["GET"])
 def conversation_messages(conversation_id):
     # Reopening an old chat: the full transcript, so the frontend can redraw it.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     db = user_file.client_for_token(token)
 
@@ -330,10 +317,26 @@ def companion_health():
 def logout():
     user_file.logout()
 
+@app.route("/account", methods=["GET"])
+def get_account():
+    # Just email + name for the profile page header -- see user.get_account.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = user_file.get_account(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 401
+
+    return jsonify({
+        "success": True,
+        "account": payload
+    })
+
 @app.route("/expenses", methods=["POST"])
 def expense():
     data = request.get_json()
-    access_token = bearer_token()
+    access_token = limit.bearer_token()
 
     if(len(data) > 2): # This is a very crude way to check if an expense or credit is being sent
         amount = data["amount"]
@@ -355,7 +358,7 @@ def expense():
 @app.route("/budget", methods=["GET"])
 def get_budget():
 
-    access_token = bearer_token()
+    access_token = limit.bearer_token()
 
     success, expenses_data = expenses.get_expenses(access_token)
 
@@ -401,7 +404,7 @@ def get_budget():
 @app.route("/fees", methods=["GET"])
 def get_fee_warnings():
 
-    access_token = bearer_token()
+    access_token = limit.bearer_token()
 
     success, fees = fee_monitor.get_fees(access_token)
 
@@ -423,7 +426,7 @@ def evaluate_purchase():
 
     data = request.get_json()
 
-    access_token = bearer_token()
+    access_token = limit.bearer_token()
 
     success, expenses_data = expenses.get_expenses(access_token)
 
@@ -467,9 +470,9 @@ def evaluate_purchase():
 # ---------------------------------------------------------------------------
 @app.route("/weekly-reflection", methods=["GET"])
 def weekly_reflection():
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     ok, payload = reflections.get_current(token)
     if not ok:
@@ -485,9 +488,9 @@ def weekly_reflection():
 def save_weekly_reflection():
     # Body: {"answer": "..."} -- answering again in the same week overwrites,
     # rather than stacking up rows the card could not show anyway.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -507,9 +510,9 @@ def save_weekly_reflection():
 @app.route("/weekly-reflection/history", methods=["GET"])
 def weekly_reflection_history():
     # Past weeks the user actually answered, newest first.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     ok, payload = reflections.list_history(token)
     if not ok:
@@ -531,9 +534,9 @@ def get_companion():
     if not COMPANION_ENABLED:
         return jsonify({"success": False, "message": "The companion is turned off."}), 404
 
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     ok, payload = companion.get_state(token)
     if not ok:
@@ -552,9 +555,9 @@ def set_companion_name():
     if not COMPANION_ENABLED:
         return jsonify({"success": False, "message": "The companion is turned off."}), 404
 
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -571,6 +574,27 @@ def set_companion_name():
     })
 
 
+@app.route("/companion/feed", methods=["POST"])
+def feed_companion():
+    # The plain feed button: no body, no model call, no reserve_send guard --
+    # see companion.feed for why it needs neither a cooldown nor a spend check.
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = companion.feed(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "companion": payload
+    })
+
+
 # ---------------------------------------------------------------------------
 # Generated documents: the monthly Kakeibo review and the onboarding profile.
 #
@@ -580,14 +604,14 @@ def set_companion_name():
 # yet", so a broken bucket cannot turn page loads into repeat generations.
 #
 # The POSTs have no such bound -- they exist to regenerate on demand -- so they
-# go through the same chat_guard.reserve_send guard as /chat.
+# go through the same limit.reserve_send guard as /chat.
 # ---------------------------------------------------------------------------
 @app.route("/monthly-report", methods=["GET"])
 def monthly_report():
     # ?month=YYYY-MM to look back at an earlier month; defaults to this one.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     ok, payload = reports.get_monthly(token, key=request.args.get("month"))
     if not ok:
@@ -603,9 +627,9 @@ def monthly_report():
 def refresh_monthly_report():
     # Regenerate and overwrite. Separate from GET on purpose: rewriting the
     # month's review costs money, so it should never happen from a page load.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     data = request.get_json(silent=True) or {}
 
@@ -613,11 +637,11 @@ def refresh_monthly_report():
     # reached, so nothing but the guard stands between a stuck retry loop and
     # the bill.
     #
-    # No chat_guard.release_send on the failure path. get_monthly does not report
+    # No limit.release_send on the failure path. get_monthly does not report
     # whether a failed run reached the model (only ask_coach does), and the
     # guard's rule is that the doubtful case counts -- costing a user one slot is
     # the cheaper mistake of the two.
-    limited = chat_guard.reserve_send(user_id)
+    limited = limit.reserve_send(user_id)
     if limited:
         return limited
 
@@ -635,9 +659,9 @@ def refresh_monthly_report():
 def get_profile():
     # markdown is null when the user has not done the interview yet -- that is a
     # normal state, not an error, and the frontend shows the interview instead.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     ok, payload = reports.get_profile(token)
     if not ok:
@@ -653,16 +677,16 @@ def get_profile():
 def submit_interview():
     # Body: {"transcript": "..."} or {"transcript": ["Q: ...", "A: ...", ...]}
     # Re-running the interview replaces the stored profile.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"success": False, "message": "Request body must be JSON."}), 400
 
     # Same guard, and the same reasoning, as POST /monthly-report above.
-    limited = chat_guard.reserve_send(user_id)
+    limited = limit.reserve_send(user_id)
     if limited:
         return limited
 

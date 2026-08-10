@@ -25,7 +25,7 @@ def add_fee(access_token, fee_name, due_date, fee_amount, reminder_days):
 
     try:
         response = (
-            db.table("fees")
+            db.table("fee")
             .insert({
                 "user_id": uuid,
                 "fee_name": fee_name,
@@ -50,7 +50,7 @@ def get_fees(access_token):
 
     try:
         response = (
-            db.table("fees")
+            db.table("fee")
             .select("*")
             .eq("user_id", uuid)
             .execute()

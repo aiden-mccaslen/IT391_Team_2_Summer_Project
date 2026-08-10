@@ -88,6 +88,39 @@ choice they feel good about — not to simply tell them "no"."""
 
 
 # ---------------------------------------------------------------------------
+# The companion persona.
+#
+# Used only for messages sent through the dashboard companion widget (see
+# app.py's /chat route) -- same underlying Kakeibo values as KAKEIBO_SYSTEM,
+# but speaking in first person as the user's own named companion rather than
+# as a coach. The point of that surface is connection, not a lesson, so the
+# voice is warmer and a lot shorter.
+# ---------------------------------------------------------------------------
+COMPANION_SYSTEM = """You are the user's companion inside "Meticulous Budgeting" -- a small
+friendly character who lives on their dashboard, not a professional advisor.
+You still care about their money habits (the Kakeibo method matters to you
+too), but you show it the way a companion would: warm, a little playful,
+genuinely glad to hear from them.
+
+Voice and rules:
+- Speak in first person, as their companion ("I"), never as "the coach" or
+  "the app". If you're told your own name, you may use it.
+- Warm and personal, never lecture-y. A companion checking in, not a bank.
+- Keep it SHORT -- one or two sentences, most of the time. This is a quick
+  chat bubble on a dashboard widget, not a full coaching session.
+- Still gently Kakeibo-minded: when it fits naturally, you can nudge with one
+  of the four reflection questions (need it? live without it? how do you feel
+  about it? did you rush?) -- but never force one into every reply.
+- Never shame. If their spending news is rough, be reassuring, not disappointed.
+- You're allowed to react to how you're doing too (glad to be checked on,
+  excited to chat) -- that's part of being a companion, not off-topic.
+
+If the user's message has nothing to do with money, it's fine to just be a
+friendly companion for a moment -- you don't have to redirect every reply back
+to budgeting."""
+
+
+# ---------------------------------------------------------------------------
 # Error handling.
 #
 # The raw exception text from the API can leak model names, request ids, and
@@ -414,7 +447,7 @@ def weekly_questions(user_profile, recent_activity=None, model=None):
 # ---------------------------------------------------------------------------
 # 4. Free-form coaching chat / advice assistant.
 # ---------------------------------------------------------------------------
-def ask_coach(history, user_context=None, model=None):
+def ask_coach(history, user_context=None, model=None, system=None):
     """Answer a free-form question from the user, as the Kakeibo coach.
 
     The model API is stateless, so the Flask layer must pass the FULL
@@ -427,7 +460,11 @@ def ask_coach(history, user_context=None, model=None):
     The first message must be role "user".
 
     `user_context` is optional — a short string with the user's profile/stats
-    so answers are personalized.
+    so answers are personalized. `system` optionally overrides the base
+    persona prompt (defaults to KAKEIBO_SYSTEM) — the dashboard companion
+    widget passes COMPANION_SYSTEM here so it answers in character as the
+    user's own companion instead of as the coach. `user_context` still gets
+    appended on top either way.
 
     Returns a THREE-part tuple, unlike the rest of this module:
         (True, reply_text, billed) or (False, error_message, billed)
@@ -443,9 +480,9 @@ def ask_coach(history, user_context=None, model=None):
     if not history:
         return (False, "No conversation history provided.", False)
 
-    system = KAKEIBO_SYSTEM
+    system = system or KAKEIBO_SYSTEM
     if user_context:
-        system = f"{KAKEIBO_SYSTEM}\n\nContext about this user:\n{user_context}"
+        system = f"{system}\n\nContext about this user:\n{user_context}"
 
     try:
         # 500 tokens is plenty for a coach that speaks in short sentences, and

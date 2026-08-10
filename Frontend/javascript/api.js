@@ -130,6 +130,23 @@ const api = {
         });
     },
 
+    /* Same endpoint as chat(), but answered in character as the user's named
+     * companion (see kakeibo_ai.COMPANION_SYSTEM) instead of as the coach.
+     * Always a fresh conversation -- the companion widget is a quick check-in,
+     * not a threaded chat. */
+    companionChat(message, companionName) {
+        return request("/chat", {
+            method: "POST",
+            authed: true,
+            body: {
+                message,
+                conversation_id: null,
+                companion: true,
+                companion_name: companionName || "",
+            },
+        });
+    },
+
     /* The 50/30/20 split of everything logged so far, plus any warnings about
      * being over 50/30 or under 20. Shape:
      *   {success, budget: {Need, Want, Savings, NeedPercent, WantPercent,
@@ -214,6 +231,12 @@ const api = {
         });
     },
 
+    /* Just email + name, for the profile page header. Not the same thing as
+     * profile() below -- that's the AI-written interview summary. */
+    account() {
+        return request("/account", { authed: true });
+    },
+
     /* The stored profile from the onboarding interview:
      *   {success, markdown}
      * `markdown` is null when the interview has not been done yet -- a normal
@@ -248,6 +271,12 @@ const api = {
             authed: true,
             body: { name },
         });
+    },
+
+    /* The plain feed button -- free, instant, no chat message needed.
+     * Returns {success, companion: {happiness, hunger}}. */
+    feedCompanion() {
+        return request("/companion/feed", { method: "POST", authed: true });
     },
 
     /* No login needed. False means the companion widget is turned off

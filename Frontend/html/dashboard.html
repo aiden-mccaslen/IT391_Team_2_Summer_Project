@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dashboard | Meticulous Budgeting</title>
   <link rel="stylesheet" href="../css/style.css" type="text/css">
+  <script src="../javascript/theme.js"></script>
 </head>
 
 <!--
@@ -38,7 +39,6 @@
           <div class="profile-menu" id="profileMenu" hidden>
             <a href="profile.html">Profile</a>
             <a href="profile.html#settings">Settings</a>
-            <a href="profile.html#notifications">Notifications</a>
             <!-- The only upgrade cue in the app. Nothing on this page is gated. -->
             <a class="menu-premium" href="profile.html#premium">Premium &#9733;</a>
             <a href="login.html" id="logoutLink">Log out</a>
@@ -137,11 +137,11 @@
         <div class="card-title">
           <h3>Your companion</h3>
           <span class="hint-dot"
-                title="Your companion's mood reflects your recent budgeting activity. It's just for fun -- it never blocks anything.">?</span>
+                title="Your companion's mood reflects your budgeting activity, and happiness/hunger go up when you chat with your coach. It's just for fun -- it never blocks anything.">?</span>
         </div>
 
         <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px">
-          <span id="companionSprite" style="font-size:40px; line-height:1" aria-hidden="true">&#129371;</span>
+          <span id="companionSprite" style="font-size:40px; line-height:1" aria-hidden="true">&#129370;</span>
           <div>
             <p id="companionName" style="margin:0; font-weight:700">Your companion</p>
             <p class="stat-sub" id="companionLevel">Level &mdash;</p>
@@ -150,10 +150,48 @@
 
         <p class="ai-prompt on-light" id="companionDialogue">&hellip;</p>
 
+        <!-- Fed by chatting with the coach -- see companion.record_chat_interaction.
+             Decay over time, boosted by a chat exchange, no separate button. -->
+        <div class="meter" style="margin-top:14px">
+          <div class="meter-head">
+            <span>Happiness</span>
+            <span class="amount" id="companionHappinessValue">&mdash;</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill happiness" id="companionHappinessFill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="meter" style="margin-bottom:0">
+          <div class="meter-head">
+            <span>Hunger</span>
+            <span class="amount" id="companionHungerValue">&mdash;</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill hunger" id="companionHungerFill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- The quiet alternative to chatting -- free, instant, no message to
+             compose. See companion.feed on the backend. -->
+        <button type="button" class="btn btn-ghost btn-sm" id="companionFeedBtn" style="margin-top:12px">
+          Feed <span aria-hidden="true">&#127807;</span>
+        </button>
+
         <form id="companionNameForm">
           <label class="visually-hidden" for="companionNameInput">Name your companion</label>
           <input type="text" id="companionNameInput" placeholder="Give your companion a name&hellip;"
                  autocomplete="off" maxlength="40" style="width:100%; max-width:320px">
+        </form>
+
+        <!-- Replaces the naming form once the companion has a name -- talking to
+             it goes through the same POST /chat as the coach, which is also what
+             feeds happiness/hunger (see companion.record_chat_interaction). -->
+        <form id="companionChatForm" style="flex-direction:row; gap:8px; margin:0" hidden>
+          <label class="visually-hidden" for="companionChatInput">Talk to your companion</label>
+          <input type="text" id="companionChatInput" placeholder="Say something to your companion&hellip;"
+                 autocomplete="off" maxlength="1000" style="flex:1">
+          <button type="submit" style="margin-top:0">Send</button>
         </form>
 
         <p class="stat-sub" id="companionStatus" hidden></p>

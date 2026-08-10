@@ -84,6 +84,28 @@ def get_user_id(token):
     except Exception as e:
         return (False,  str(e))
 
+def get_account(token):
+# For the profile page: the caller's email and display name. Separate from
+# get_user_id, which only returns the uuid every other endpoint needs -- this
+# one exists purely to have something human-readable to show on screen.
+    try:
+        response = supabase_client.auth.get_user(token)
+
+        if (response == None or response.user == None):
+            return (False, "Invalid or expired token")
+
+        metadata = response.user.user_metadata or {}
+        name = metadata.get("full_name") or metadata.get("display_name") or ""
+
+        return (True, {
+            "email": response.user.email,
+            "name": name,
+        })
+    except AuthApiError as e:
+        return (False,  str(e))
+    except Exception as e:
+        return (False,  str(e))
+
 def client_for_token(token):
 # Builds a throwaway Supabase client that talks to the database AS the logged-in
 # user, for one request only.

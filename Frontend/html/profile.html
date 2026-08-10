@@ -1,1 +1,105 @@
-<!-- This needs implementation -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Profile | Meticulous Budgeting</title>
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
+  <script src="../javascript/theme.js"></script>
+</head>
+
+<body class="dashboard">
+
+  <header class="app-header">
+    <div class="wrap">
+      <a class="brand" href="dashboard.html">
+        <span class="brand-mark" aria-hidden="true">&#165;</span>
+        <span>Meticulous Budgeting</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="expenses.html">Expenses</a>
+        <a href="monthly.html">Monthly review</a>
+        <a href="chat.html">Coach</a>
+
+        <div class="profile">
+          <button class="avatar-btn" id="avatarBtn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+            <span id="avatarInitials" aria-hidden="true">&#183;&#183;</span>
+            <span class="visually-hidden">Open profile menu</span>
+          </button>
+
+          <div class="profile-menu" id="profileMenu" hidden>
+            <a href="profile.html" aria-current="page">Profile</a>
+            <a href="profile.html#settings">Settings</a>
+            <!-- The only upgrade cue in the app. Nothing on this page is gated. -->
+            <a class="menu-premium" href="profile.html#premium">Premium &#9733;</a>
+            <a href="login.html" id="logoutLink">Log out</a>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="wrap">
+
+      <div class="dash-greeting">
+        <h1>Your profile</h1>
+        <p>Account details and how the app looks and behaves for you.</p>
+      </div>
+
+      <section class="card" aria-labelledby="accountHeading" style="margin-bottom:20px">
+        <div class="card-title">
+          <h3 id="accountHeading">Account</h3>
+        </div>
+
+        <p class="stat-sub" id="accountStatus">Loading your account&hellip;</p>
+
+        <dl style="margin:0; display:grid; gap:12px" id="accountDetails" hidden>
+          <div>
+            <dt class="field-note">Name</dt>
+            <dd style="margin:2px 0 0; font-size:15px" id="accountName">&mdash;</dd>
+          </div>
+          <div>
+            <dt class="field-note">Email</dt>
+            <dd style="margin:2px 0 0; font-size:15px" id="accountEmail">&mdash;</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card" id="settings" aria-labelledby="settingsHeading" style="margin-bottom:20px">
+        <div class="card-title">
+          <h3 id="settingsHeading">Settings</h3>
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" id="darkModeToggle">
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          <span>Dark mode</span>
+        </label>
+      </section>
+
+      <section class="card" id="premium" aria-labelledby="premiumHeading">
+        <div class="card-title">
+          <h3 id="premiumHeading">Premium <span aria-hidden="true">&#9733;</span></h3>
+          <span class="badge badge-free">Free core</span>
+        </div>
+
+        <p style="margin:0">
+          Every budgeting and reflection feature in Meticulous Budgeting is free,
+          always. There's nothing to upgrade to yet &mdash; this is a placeholder
+          for whatever comes next.
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <script src="../javascript/api.js"></script>
+  <script src="../javascript/profile-menu.js"></script>
+  <script src="../javascript/profile.js"></script>
+</body>
+</html>

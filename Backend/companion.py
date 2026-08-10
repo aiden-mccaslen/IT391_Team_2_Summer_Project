@@ -5,12 +5,20 @@ never gates anything: it only reflects state that other features already own.
 
 That is the load-bearing design rule of this file, so it is worth stating
 plainly: companion.py READS expenses.py, budget.py and reflections.py, but
-nothing in those files (or anywhere else in the backend) imports or calls into
-this one. The dependency arrow points one way, out from here. That is what
-makes the feature removable -- delete this file, its migration
-(migrations/005_companion.sql), and the two frontend companion files, and
-every other module keeps working unmodified, because nothing else ever knew
-this one existed.
+nothing in those files imports or calls into this one. The dependency arrow
+points one way, out from here. That is what makes the feature removable --
+delete this file, its migrations (migrations/005_companion.sql,
+migrations/006_companion_stats.sql), and the two frontend companion files,
+and every other module keeps working unmodified.
+
+The one deliberate exception: app.py's POST /chat calls
+record_chat_interaction() after a successful reply, best-effort, guarded the
+same way every other companion route is (`companion is not None and
+COMPANION_ENABLED`). A failure in there is logged and swallowed -- it must
+never turn a working chat reply into a failed request just because the
+cosmetic widget could not be updated. That is the only place outside this
+file that reaches in; chat_history, budget, expenses and reflections still
+have no idea this module exists.
 
 Like reflections.py, every function here takes the caller's access token and
 builds its own per-user client through user.caller_client(), so Row Level
@@ -25,6 +33,12 @@ rather than being pushed in by hooks in those other files. The stored row
 persists the most recent computed value (so a page that only shows the
 cached row still sees something sensible), but this file is the only writer
 of it.
+
+Happiness/hunger work the same way but on a shorter, game-ier loop: they
+decay over real elapsed time (see _synced_stats) and get boosted by
+record_chat_interaction(). Chatting with the coach is the "feed/play with
+your companion" action -- there is no separate button for it, on purpose:
+using the app IS the interaction.
 """
 
 import logging
@@ -55,7 +69,39 @@ MOOD_NEGLECTED = "neglected"
 MAX_LEVEL = 10
 STAGE_COUNT = 4  # 0..3
 
-FIELDS = "user_id, name, level, stage, streak, created_at, last_interacted_at"
+# Happiness/hunger: both 0..100, decaying toward 0 over real elapsed time and
+# boosted by chatting with the coach (record_chat_interaction). Hunger decays
+# faster than happiness -- the same "needs more frequent attention" split a
+# real Tamagotchi has between the two.
+STAT_MIN = 0
+STAT_MAX = 100
+DEFAULT_HAPPINESS = 70
+DEFAULT_HUNGER = 70
+HAPPINESS_DECAY_PER_HOUR = 0.4
+HUNGER_DECAY_PER_HOUR = 1.0
+
+# One chat exchange's worth of "feeding"/"playing". Deliberately generous
+# relative to the decay rates above -- a single conversation should visibly
+# help, not round to nothing.
+CHAT_HAPPINESS_BOOST = 15
+CHAT_HUNGER_BOOST = 20
+
+# The plain feed button: mostly about hunger, a little happiness, and -- unlike
+# the chat boost -- free (no model call, so no reserve_send guard needed).
+# Smaller than the chat boost on purpose, so chatting stays the better payoff
+# and the button is a top-up, not a strictly-better substitute. No cooldown:
+# both stats cap at STAT_MAX, so mashing the button just gets you to full
+# faster and then does nothing -- that ceiling is the only throttle it needs.
+FEED_HUNGER_BOOST = 15
+FEED_HAPPINESS_BOOST = 5
+
+# At or below this, either stat alone reads as neglected regardless of the
+# budgeting streak -- the whole point of wiring chat in is that ignoring the
+# companion itself now has a visible consequence, not just ignoring the budget.
+LOW_STAT_THRESHOLD = 25
+
+FIELDS = ("user_id, name, level, stage, streak, happiness, hunger, "
+          "created_at, last_interacted_at, stats_synced_at")
 
 # Used the same way FALLBACK_QUESTIONS is used in reflections.py: a small
 # static pool, keyed on the day so the line still changes day to day, with no
@@ -63,22 +109,22 @@ FIELDS = "user_id, name, level, stage, streak, created_at, last_interacted_at"
 # it at all -- these are the only lines it ever shows).
 DIALOGUE_LINES = {
     MOOD_POSITIVE: [
-        "You're on a roll! Every logged expense keeps me glowing.",
-        "Look at that streak -- I love watching you stay on budget.",
-        "We're doing great this week. Keep it up!",
-        "Your 50/30/20 split looks healthy right now. Nice work.",
+        "You're on a roll! I love spending this streak with you.",
+        "Look at that streak -- I'm so proud of you right now.",
+        "We're doing great this week. I'm having a lot of fun with you!",
+        "Your 50/30/20 split looks healthy right now. You're amazing.",
     ],
     MOOD_NEUTRAL: [
-        "I'm doing okay -- log a few expenses and I'll perk up.",
-        "Steady as she goes. A weekly reflection would make my day.",
-        "Nothing wrong, but I could use a little more attention.",
-        "Things are quiet. Add an expense and let's see how it goes.",
+        "I'm doing okay -- come say hi and I'll perk right up.",
+        "Steady as she goes. I'd love to hear how your week's going.",
+        "Nothing's wrong, I just missed you a little. Tell me something!",
+        "Things are quiet. Pop in and chat with me for a bit?",
     ],
     MOOD_NEGLECTED: [
-        "I haven't seen an expense in a while -- I'm feeling a bit forgotten.",
-        "It's been quiet. Log something so I know you're still budgeting!",
-        "I'm a little droopy. Come back and check in on your spending.",
-        "Your budget warnings are piling up -- and so is my worry.",
+        "I've missed you -- it's been a while since we talked.",
+        "It's been quiet without you. Come say hi so I know you're okay!",
+        "I'm feeling a little lonely. Even a quick hello would make my day.",
+        "Things have been a bit rough lately -- I'm here whenever you're ready.",
     ],
 }
 
@@ -148,6 +194,47 @@ def score_companion(streak_days, warning_count, reflection_weeks):
     stage = min(STAGE_COUNT - 1, level // ((MAX_LEVEL // STAGE_COUNT) + 1))
 
     return {"mood": mood, "level": level, "stage": stage}
+
+
+def _decay(value, per_hour, hours_elapsed):
+    """Pure: linear decay toward STAT_MIN, clamped to the stat's range. The
+    other half of score_companion's "pure scoring, no I/O" split -- this is
+    what a unit test exercises for the decay curve itself."""
+    hours_elapsed = max(0.0, hours_elapsed or 0.0)
+    return max(STAT_MIN, min(STAT_MAX, int(round((value or 0) - per_hour * hours_elapsed))))
+
+
+def _hours_since(timestamp_iso):
+    """Pure-ish (reads the clock, nothing else): hours between `timestamp_iso`
+    and now, or 0 if it is missing or unparseable -- a brand-new row, or one
+    from before this column existed, should not be treated as having decayed
+    for however long the row happens to be old."""
+    if not timestamp_iso:
+        return 0.0
+    try:
+        then = datetime.fromisoformat(str(timestamp_iso).replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    if then.tzinfo is None:
+        then = then.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(timezone.utc) - then).total_seconds() / 3600)
+
+
+def _synced_stats(row):
+    """Happiness/hunger with whatever decay is owed since this row's last
+    sync applied, WITHOUT persisting it -- every caller is about to write
+    something anyway (get_state refreshes level/stage/streak regardless;
+    record_chat_interaction is about to add the chat boost on top), so there
+    is always exactly one write per read and never a dangling unsaved decay.
+
+    Falls back to created_at when stats_synced_at is still null -- true for
+    every row that existed before this column did, and for a row that was
+    just created this call (_ensure_row does not stamp it).
+    """
+    hours = _hours_since(row.get("stats_synced_at") or row.get("created_at"))
+    happiness = _decay(row.get("happiness", DEFAULT_HAPPINESS), HAPPINESS_DECAY_PER_HOUR, hours)
+    hunger = _decay(row.get("hunger", DEFAULT_HUNGER), HUNGER_DECAY_PER_HOUR, hours)
+    return happiness, hunger
 
 
 def _dialogue_line(mood, seed):
@@ -295,8 +382,8 @@ def get_state(access_token):
     """The companion's current mood, level and dialogue line, computed fresh
     from real signals every time this is called.
 
-    Returns (True, {"name", "mood", "level", "stage", "streak", "dialogue",
-    "last_interacted_at"}) or (False, error_message).
+    Returns (True, {"name", "mood", "level", "stage", "streak", "happiness",
+    "hunger", "dialogue", "last_interacted_at"}) or (False, error_message).
     """
     caller = user_file.caller_client(access_token)
     if caller[0] is None:
@@ -310,6 +397,13 @@ def get_state(access_token):
     streak_days, warning_count, reflection_weeks = _signals(access_token)
     scored = score_companion(streak_days, warning_count, reflection_weeks)
 
+    happiness, hunger = _synced_stats(row)
+    # A neglected companion is neglected whether that shows up as a broken
+    # budgeting streak or as nobody having chatted with it -- either stat
+    # alone is enough to override an otherwise fine budgeting-based mood.
+    if happiness <= LOW_STAT_THRESHOLD or hunger <= LOW_STAT_THRESHOLD:
+        scored["mood"] = MOOD_NEGLECTED
+
     now_iso = datetime.now(timezone.utc).isoformat()
     try:
         response = (db.table("companion_state")
@@ -317,6 +411,9 @@ def get_state(access_token):
                           "level": scored["level"],
                           "stage": scored["stage"],
                           "streak": streak_days,
+                          "happiness": happiness,
+                          "hunger": hunger,
+                          "stats_synced_at": now_iso,
                           "last_interacted_at": now_iso,
                       })
                       .eq("user_id", uuid)
@@ -336,9 +433,69 @@ def get_state(access_token):
         "level": scored["level"],
         "stage": scored["stage"],
         "streak": streak_days,
+        "happiness": happiness,
+        "hunger": hunger,
         "dialogue": _dialogue_line(scored["mood"], today_ordinal),
         "last_interacted_at": row.get("last_interacted_at"),
     })
+
+
+def _boost(access_token, happiness_boost, hunger_boost):
+    """Shared by record_chat_interaction and feed: apply whatever decay is
+    owed, then add a boost, capped at STAT_MAX.
+
+    Returns (True, {"happiness", "hunger"}) or (False, error_message).
+    """
+    caller = user_file.caller_client(access_token)
+    if caller[0] is None:
+        return (False, caller[1])
+    uuid, db = caller
+
+    ok, row = _ensure_row(db, uuid)
+    if not ok:
+        return (False, row)
+
+    happiness, hunger = _synced_stats(row)
+    happiness = min(STAT_MAX, happiness + happiness_boost)
+    hunger = min(STAT_MAX, hunger + hunger_boost)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        db.table("companion_state").update({
+            "happiness": happiness,
+            "hunger": hunger,
+            "stats_synced_at": now_iso,
+            "last_interacted_at": now_iso,
+        }).eq("user_id", uuid).execute()
+    except Exception:
+        log.exception("could not update companion stats for %s", uuid)
+        return (False, "Could not update your companion.")
+
+    return (True, {"happiness": happiness, "hunger": hunger})
+
+
+def record_chat_interaction(access_token):
+    """Called from POST /chat after a successful reply: chatting with the
+    coach is one way to feed/play with your companion (see feed() for the
+    low-friction alternative), so this is the only thing outside this file
+    that ever writes here (see the module docstring).
+
+    Best-effort by design -- the caller in app.py must never let a failure
+    here turn a working chat reply into a failed request.
+
+    Returns (True, {"happiness", "hunger"}) or (False, error_message).
+    """
+    return _boost(access_token, CHAT_HAPPINESS_BOOST, CHAT_HUNGER_BOOST)
+
+
+def feed(access_token):
+    """The plain feed button: a free, instant top-up with no model call and
+    no rate-limit guard needed -- for someone who just wants to check in on
+    their companion without composing a chat message.
+
+    Returns (True, {"happiness", "hunger"}) or (False, error_message).
+    """
+    return _boost(access_token, FEED_HAPPINESS_BOOST, FEED_HUNGER_BOOST)
 
 
 def set_name(access_token, name):
