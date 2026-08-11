@@ -19,8 +19,10 @@ if (
     window.location.hostname === "127.0.0.1"
 ) {
     API_BASE_URL = "http://localhost:5000";
+} else if (window.location.origin && window.location.origin !== "null") {
+    API_BASE_URL = window.location.origin;
 } else {
-    API_BASE_URL = "https://it391-team-2-summer-project.onrender.com";
+    API_BASE_URL = "http://localhost:5000";
 }
 
 const TOKEN_KEY = "mb_access_token";
