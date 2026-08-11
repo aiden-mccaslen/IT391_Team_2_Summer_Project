@@ -214,11 +214,7 @@ def _model_call(messages, *, system, model=None, max_tokens=1500,
             },
         }
 
-    try:
-        return client.chat.completions.create(**kwargs)
-    except Exception as e:
-        log.exception("MODEL CALL FAILED: %s", e)
-        raise
+    return client.chat.completions.create(**kwargs)
 
 
 def _structured_call(user_content, schema, *, model=None, max_tokens=1500,
