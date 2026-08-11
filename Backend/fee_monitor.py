@@ -1,22 +1,31 @@
+from dotenv import load_dotenv
 from supabase import create_client
 from datetime import date, datetime
 import os
+import user as user_file
+
+# load_dotenv() here too: this module reads the environment at import time, and it
+# must not depend on some other module happening to be imported first.
+load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Anonymous, same as in expenses.py -- the table queries below go through the
+# per-user client instead so Row Level Security sees an auth.uid().
 
 # Need to implement fee monitoring
 
 def add_fee(access_token, fee_name, due_date, fee_amount, reminder_days):
 
-    try:
-        user_response = supabase_client.auth.get_user(access_token)
-        uuid = user_response.user.id
+    uuid, db = user_file.caller_client(access_token)
+    if uuid is None:
+        return (False, db)
 
+    try:
         response = (
-            supabase_client.table("fees")
+            db.table("fee")
             .insert({
                 "user_id": uuid,
                 "fee_name": fee_name,
@@ -35,12 +44,13 @@ def add_fee(access_token, fee_name, due_date, fee_amount, reminder_days):
 
 def get_fees(access_token):
 
-    try:
-        user_response = supabase_client.auth.get_user(access_token)
-        uuid = user_response.user.id
+    uuid, db = user_file.caller_client(access_token)
+    if uuid is None:
+        return (False, db)
 
+    try:
         response = (
-            supabase_client.table("fees")
+            db.table("fee")
             .select("*")
             .eq("user_id", uuid)
             .execute()

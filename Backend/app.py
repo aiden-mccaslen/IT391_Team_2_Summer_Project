@@ -1,16 +1,78 @@
-# route logout back to signup (and add the "you have logged out popup")
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
 from  flask import request, Flask, jsonify, url_for, redirect
 from flask_cors import CORS
 import user as user_file
 import kakeibo_ai
 import chat_history
+import limit
 import expenses
+import budget
+import fee_monitor
+import purchase_rules
+import reflections
+import reports
 
+# The companion widget is entirely optional: nothing else in the backend
+# imports this module, so if companion.py (or its migration) is ever deleted,
+# the only thing that should notice is the companion routes themselves --
+# never the rest of the app. Guarding the import is what makes that true: an
+# un-guarded `import companion` would crash the whole process on startup the
+# moment the file was gone.
+try:
+    import companion
+except ImportError:
+    companion = None
+
+
+# All backend logging lands in Backend/logs/app.log (rotated at ~1MB so it can
+# never grow without bound). The AI layer logs the real API exceptions here;
+# users only ever see the friendly one-liners.
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    _log_handler = RotatingFileHandler(os.path.join(LOG_DIR, "app.log"),
+                                       maxBytes=1_000_000, backupCount=3,
+                                       encoding="utf-8")
+except OSError:
+    # An unwritable app directory must not stop the app from booting -- losing
+    # the log file is survivable, taking login/signup down with it is not.
+    _log_handler = logging.StreamHandler()
+
+_log_handler.setFormatter(
+    logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+logging.getLogger().addHandler(_log_handler)
+
+# Root stays at WARNING on purpose: httpx logs an INFO line for every Supabase
+# and OpenAI request (roughly six per /chat), which would push the AI tracebacks
+# -- the only record of what actually went wrong -- out of the rotation. Our own
+# loggers are turned up to INFO individually.
+logging.getLogger().setLevel(logging.WARNING)
+logging.getLogger("kakeibo").setLevel(logging.INFO)
+log = logging.getLogger("kakeibo.app")
+
+
+# Serving the frontend from Flask keeps everything on one origin, so the browser
+# is not making cross-origin calls to our own API.
 app = Flask(__name__, static_folder="../Frontend", static_url_path="")
 CORS(app, origins=[
     "http://localhost:5500",
     "https://meticulousbudgeting.netlify.app"
 ])
+
+# Off switch for the companion widget, independent of whether the module import
+# above succeeded -- COMPANION_ENABLED lets it be turned off without removing
+# the file, and `companion is None` covers the file being deleted outright.
+# Either one turns off the routes below and makes /health/companion report
+# false; every other route in this file is unaffected either way. Defaults to
+# enabled, same convention as the AI layer's own env-var checks.
+COMPANION_ENABLED = companion is not None and os.environ.get(
+    "COMPANION_ENABLED", "true").strip().lower() not in ("false", "0", "no", "off")
+
+
 
 '''
 @app.route("/test", methods=["POST"])
@@ -73,9 +135,9 @@ def chat():
     # it back to us. It sends ONE message plus the id of the chat it belongs to
     # (or null to start a new chat), and we load the history out of Supabase:
     #     {"conversation_id": "<uuid>" or null, "message": "..."}
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     # silent=True: malformed JSON gives us None instead of Flask's HTML error
     # page, so the frontend always gets our {"success": false} shape back.
@@ -85,6 +147,10 @@ def chat():
 
     message = (data.get("message") or "").strip()
     conversation_id = data.get("conversation_id") # null on the first message of a new chat
+    # Sent by the dashboard companion widget only (see companion.js) -- swaps
+    # in kakeibo_ai.COMPANION_SYSTEM below instead of the coach persona.
+    is_companion_chat = bool(data.get("companion"))
+    companion_name = (data.get("companion_name") or "").strip()
 
     if not message:
         return jsonify({"success": False, "message": "Message is empty."}), 400
@@ -93,16 +159,16 @@ def chat():
     # anyone pasting a document in -- we would pay to resend it on every one of
     # the next 30 turns while it sits in the replay window.
     message = " ".join(message.split())
-    if len(message) > MAX_MESSAGE_CHARS:
+    if len(message) > limit.MAX_MESSAGE_CHARS:
         return jsonify({
             "success": False,
             "message": f"Please keep messages to one paragraph "
-                       f"(under {MAX_MESSAGE_CHARS} characters)."
+                       f"(under {limit.MAX_MESSAGE_CHARS} characters)."
         }), 400
 
     # Claims the slot up front -- every early return below hands it back, since
     # none of them reached the model.
-    limited = reserve_send(user_id)
+    limited = limit.reserve_send(user_id)
     if limited:
         return limited
 
@@ -117,21 +183,21 @@ def chat():
         # is indistinguishable from one that does not exist -- both are "not found".
         status = chat_history.get_conversation(db, conversation_id)
         if not status[0]:
-            release_send(user_id)
+            limit.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 404
         conversation = status[1]
     else:
         status = chat_history.create_conversation(db, user_id, message)
         if not status[0]:
-            release_send(user_id)
+            limit.release_send(user_id)
             return jsonify({"success": False, "message": status[1]}), 500
         conversation = status[1]
         conversation_id = conversation["id"]
 
     status = chat_history.add_message(db, conversation_id, "user", message)
     if not status[0]:
-        release_send(user_id)
-        rollback_turn(db, conversation_id, None, is_new_conversation)
+        limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, None, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     user_message_id = status[1]["id"]
 
@@ -139,23 +205,40 @@ def chat():
     # recent window of it, straight from the database.
     status = chat_history.get_recent_messages(db, conversation_id)
     if not status[0]:
-        release_send(user_id)
-        rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+        limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": status[1]}), 500
     history = status[1]
 
     # Anything older than that window lives on as the rolling summary, which the
     # coach reads as context. It is None until the chat gets long (see chat_history).
+    user_context = conversation.get("summary")
+    persona = None
+    if is_companion_chat:
+        persona = kakeibo_ai.COMPANION_SYSTEM
+        if companion_name:
+            name_line = f'Your name (as the companion) is "{companion_name}".'
+            user_context = f"{name_line}\n{user_context}" if user_context else name_line
+
     ok, payload, billed = kakeibo_ai.ask_coach(
-        history, user_context=conversation.get("summary"))
+        history, user_context=user_context, system=persona)
     # ask_coach returns three parts: success, the reply text or an error message,
     # and whether the attempt actually cost money.
     if not ok:
         if not billed:
-            release_send(user_id)
-        rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
+            limit.release_send(user_id)
+        limit.rollback_turn(db, conversation_id, user_message_id, is_new_conversation)
         return jsonify({"success": False, "message": payload}), 502
     reply = payload
+
+    # Chatting with the coach is the companion's "feed/play with it" action --
+    # see companion.py's module docstring. Best-effort: a working chat reply
+    # must never turn into a failed request just because this could not.
+    if companion is not None and COMPANION_ENABLED:
+        try:
+            companion.record_chat_interaction(token)
+        except Exception:
+            log.exception("companion interaction failed for %s", user_id)
 
     status = chat_history.add_message(db, conversation_id, "assistant", reply)
     if not status[0]:
@@ -176,9 +259,9 @@ def chat():
 @app.route("/conversations", methods=["GET"])
 def conversations():
     # The chat sidebar: every chat this user has, newest first.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     db = user_file.client_for_token(token)
     status = chat_history.list_conversations(db, user_id)
@@ -193,9 +276,9 @@ def conversations():
 @app.route("/conversations/<conversation_id>/messages", methods=["GET"])
 def conversation_messages(conversation_id):
     # Reopening an old chat: the full transcript, so the frontend can redraw it.
-    token, user_id = get_caller()
+    token, user_id = limit.get_caller()
     if token is None:
-        return unauthorized()
+        return limit.unauthorized()
 
     db = user_file.client_for_token(token)
 
@@ -222,25 +305,43 @@ def ai_health():
     # currently down" tooltip instead of letting the user type.
     return jsonify({"ai_available": kakeibo_ai.is_configured()})
 
+@app.route("/health/companion", methods=["GET"])
+def companion_health():
+    # Same shape and purpose as /health/ai: no login needed, and the frontend
+    # (see api.companionAvailable()) fails OPEN if this cannot be reached at
+    # all -- an unknown answer should not hide the widget any more than it
+    # would grey out the chat box.
+    return jsonify({"companion_available": COMPANION_ENABLED})
+
 @app.route("/logout")
 def logout():
     user_file.logout()
 
+@app.route("/account", methods=["GET"])
+def get_account():
+    # Just email + name for the profile page header -- see user.get_account.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
 
-# ---------------------------------------------------------------------------
-# Expenses, budget, fees and purchase rules.
-# ---------------------------------------------------------------------------
+    ok, payload = user_file.get_account(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 401
+
+    return jsonify({
+        "success": True,
+        "account": payload
+    })
+
 @app.route("/expenses", methods=["POST"])
 def expense():
-    print("expense routed")
     data = request.get_json()
-    access_token = bearer_token()
+    access_token = limit.bearer_token()
 
-    if(len(data) > 2):
+    if(len(data) > 2): # This is a very crude way to check if an expense or credit is being sent
         amount = data["amount"]
         purchase_date = data["purchase_date"]
         category = data["category"]
-        print(access_token)
         status = expenses.report_expense(access_token, amount, purchase_date, category)
     else:
         amount = data["amount"]
@@ -252,5 +353,362 @@ def expense():
         "message": status[1]
     })
 
+
+
+@app.route("/budget", methods=["GET"])
+def get_budget():
+
+    access_token = limit.bearer_token()
+
+    success, expenses_data = expenses.get_expenses(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": expenses_data
+        })
+
+    success, funds_data = expenses.get_balance(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": funds_data
+        })
+
+    checking, savings = expenses._split_funds(funds_data) # I updated the funds table and made a split funds function
+                                                          # to grab the information from each account easier
+    income = checking
+
+
+    #Updated this
+    """income = 0
+
+    if len(funds_data) > 0:
+    income = float(funds_data[0]["amount"])"""
+
+    # This user info from the _split_funds helper function since I updated
+    summary = budget.calculate_budget(income, expenses_data)
+
+    summary["Savings"] = savings #Regrabbing savings using _split_funds function
+
+    warnings = budget.evaluate_budget(summary)
+
+    return jsonify({
+        "success": True,
+        "budget": summary,
+        "warnings": warnings
+    })
+
+
+@app.route("/fees", methods=["GET"])
+def get_fee_warnings():
+
+    access_token = limit.bearer_token()
+
+    success, fees = fee_monitor.get_fees(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": fees
+        })
+
+    warnings = fee_monitor.check_fee_warnings(fees)
+
+    return jsonify({
+        "success": True,
+        "warnings": warnings
+    })
+
+@app.route("/purchase-rules", methods=["POST"])
+def evaluate_purchase():
+
+    data = request.get_json()
+
+    access_token = limit.bearer_token()
+
+    success, expenses_data = expenses.get_expenses(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": expenses_data
+        })
+
+    success, funds_data = expenses.get_balance(access_token)
+
+    if not success:
+        return jsonify({
+            "success": False,
+            "message": funds_data
+        })
+
+    checking, _ = expenses._split_funds(funds_data)
+    income = checking
+
+    result = purchase_rules.evaluate_purchase(
+    income,
+    expenses_data,
+    float(data["amount"]),
+    data["category"]
+    )
+
+    return jsonify({
+    "success": True,
+    "result": result
+    })
+
+
+# ---------------------------------------------------------------------------
+# Weekly reflection -- the dashboard card.
+#
+# The question is generated once per user per week and then stored, so the model
+# call happens on the first load of the week and every load after that is a plain
+# database read. That is what keeps this feature off the spending guards above:
+# there is no way to make it call the model more than once a week per user.
+# ---------------------------------------------------------------------------
+@app.route("/weekly-reflection", methods=["GET"])
+def weekly_reflection():
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = reflections.get_current(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "reflection": payload
+    })
+
+
+@app.route("/weekly-reflection", methods=["POST"])
+def save_weekly_reflection():
+    # Body: {"answer": "..."} -- answering again in the same week overwrites,
+    # rather than stacking up rows the card could not show anyway.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    ok, payload = reflections.save_answer(token, data.get("answer"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Reflection saved.",
+        "reflection": payload
+    })
+
+
+@app.route("/weekly-reflection/history", methods=["GET"])
+def weekly_reflection_history():
+    # Past weeks the user actually answered, newest first.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = reflections.list_history(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "reflections": payload
+    })
+
+
+# ---------------------------------------------------------------------------
+# Companion widget -- a cosmetic dashboard mascot. It only reflects data that
+# expenses/budget/reflections already own, so there is no write path here that
+# any other feature depends on; these two routes are the entire surface area.
+# ---------------------------------------------------------------------------
+@app.route("/companion", methods=["GET"])
+def get_companion():
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = companion.get_state(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "companion": payload
+    })
+
+
+@app.route("/companion/name", methods=["POST"])
+def set_companion_name():
+    # Body: {"name": "..."} -- purely cosmetic, so there is nothing to
+    # validate here beyond what companion.set_name already checks.
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    ok, payload = companion.set_name(token, data.get("name"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "message": "Companion name saved.",
+        "companion": payload
+    })
+
+
+@app.route("/companion/feed", methods=["POST"])
+def feed_companion():
+    # The plain feed button: no body, no model call, no reserve_send guard --
+    # see companion.feed for why it needs neither a cooldown nor a spend check.
+    if not COMPANION_ENABLED:
+        return jsonify({"success": False, "message": "The companion is turned off."}), 404
+
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = companion.feed(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "companion": payload
+    })
+
+
+# ---------------------------------------------------------------------------
+# Generated documents: the monthly Kakeibo review and the onboarding profile.
+#
+# Both are stored as Markdown files in Supabase Storage (see reports.py), so a
+# GET is normally a file read: storage bounds the GETs to one model call per
+# month, and a read that fails is reported rather than treated as "not written
+# yet", so a broken bucket cannot turn page loads into repeat generations.
+#
+# The POSTs have no such bound -- they exist to regenerate on demand -- so they
+# go through the same limit.reserve_send guard as /chat.
+# ---------------------------------------------------------------------------
+@app.route("/monthly-report", methods=["GET"])
+def monthly_report():
+    # ?month=YYYY-MM to look back at an earlier month; defaults to this one.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = reports.get_monthly(token, key=request.args.get("month"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "report": payload
+    })
+
+
+@app.route("/monthly-report", methods=["POST"])
+def refresh_monthly_report():
+    # Regenerate and overwrite. Separate from GET on purpose: rewriting the
+    # month's review costs money, so it should never happen from a page load.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    data = request.get_json(silent=True) or {}
+
+    # Claimed up front, like /chat: this route calls the model every time it is
+    # reached, so nothing but the guard stands between a stuck retry loop and
+    # the bill.
+    #
+    # No limit.release_send on the failure path. get_monthly does not report
+    # whether a failed run reached the model (only ask_coach does), and the
+    # guard's rule is that the doubtful case counts -- costing a user one slot is
+    # the cheaper mistake of the two.
+    limited = limit.reserve_send(user_id)
+    if limited:
+        return limited
+
+    ok, payload = reports.get_monthly(token, key=data.get("month"), refresh=True)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    return jsonify({
+        "success": True,
+        "report": payload
+    })
+
+
+@app.route("/profile", methods=["GET"])
+def get_profile():
+    # markdown is null when the user has not done the interview yet -- that is a
+    # normal state, not an error, and the frontend shows the interview instead.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    ok, payload = reports.get_profile(token)
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 500
+
+    return jsonify({
+        "success": True,
+        "markdown": payload
+    })
+
+
+@app.route("/profile/interview", methods=["POST"])
+def submit_interview():
+    # Body: {"transcript": "..."} or {"transcript": ["Q: ...", "A: ...", ...]}
+    # Re-running the interview replaces the stored profile.
+    token, user_id = limit.get_caller()
+    if token is None:
+        return limit.unauthorized()
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "message": "Request body must be JSON."}), 400
+
+    # Same guard, and the same reasoning, as POST /monthly-report above.
+    limited = limit.reserve_send(user_id)
+    if limited:
+        return limited
+
+    ok, payload = reports.save_profile(token, data.get("transcript"))
+    if not ok:
+        return jsonify({"success": False, "message": payload}), 400
+
+    # The profile was written either way; `stored` says whether we managed to
+    # keep it, and the message does not claim we did when we did not.
+    return jsonify({
+        "success": True,
+        "message": "Profile saved." if payload["stored"] else
+                   "Here is your profile, but it could not be saved -- you may "
+                   "need to take the interview again later.",
+        "markdown": payload["markdown"]
+    })
+
+
 if __name__ == "__main__":
-    app.run(debug=True) #, port=5500)
+    # Backend/logs/app.log sits inside the tree the debug reloader watches, and
+    # every request writes a line to it (Werkzeug's own access log propagates to
+    # the root handler above) -- without this exclusion, every request's log
+    # write triggers a reload, which drops in-flight requests and looks to the
+    # browser like the page never finishes loading.
+    app.run(debug=True, exclude_patterns=["*/logs/*"])

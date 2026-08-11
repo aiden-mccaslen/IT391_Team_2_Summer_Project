@@ -75,7 +75,7 @@ async function request(path, { method = "GET", body = null, authed = false } = {
         }
         headers["Authorization"] = `Bearer ${token}`;
     }
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}${path}`, {
             method,
@@ -130,6 +130,23 @@ const api = {
         });
     },
 
+    /* Same endpoint as chat(), but answered in character as the user's named
+     * companion (see kakeibo_ai.COMPANION_SYSTEM) instead of as the coach.
+     * Always a fresh conversation -- the companion widget is a quick check-in,
+     * not a threaded chat. */
+    companionChat(message, companionName) {
+        return request("/chat", {
+            method: "POST",
+            authed: true,
+            body: {
+                message,
+                conversation_id: null,
+                companion: true,
+                companion_name: companionName || "",
+            },
+        });
+    },
+
     /* The 50/30/20 split of everything logged so far, plus any warnings about
      * being over 50/30 or under 20. Shape:
      *   {success, budget: {Need, Want, Savings, NeedPercent, WantPercent,
@@ -138,12 +155,49 @@ const api = {
         return request("/budget", { authed: true });
     },
 
+    /* This week's coach question plus the answer if one is already saved:
+     *   {success, reflection: {id, week_start, question, answer, answered_at}}
+     * The question is generated on the first call of the week and stored, so
+     * calling this on every dashboard load is cheap. */
+    weeklyReflection() {
+        return request("/weekly-reflection", { authed: true });
+    },
+
+    /* Save (or replace) this week's answer. */
+    saveWeeklyReflection(answer) {
+        return request("/weekly-reflection", {
+            method: "POST",
+            authed: true,
+            body: { answer },
+        });
+    },
+
     conversations() {
         return request("/conversations", { authed: true });
     },
 
     messages(conversationId) {
         return request(`/conversations/${conversationId}/messages`, { authed: true });
+    },
+
+
+    /* POST /expenses tells an expense from a fund/credit entry by shape --
+     * amount+purchase_date+category vs amount+account -- so these stay as two
+     * named calls rather than one generic passthrough. */
+    addExpense(amount, purchaseDate, category) {
+        return request("/expenses", {
+            method: "POST",
+            authed: true,
+            body: { amount, purchase_date: purchaseDate, category },
+        });
+    },
+
+    addFund(amount, account) {
+        return request("/expenses", {
+            method: "POST",
+            authed: true,
+            body: { amount, account },
+        });
     },
 
     /* No login needed. False means the coach is misconfigured server-side, and
@@ -155,5 +209,86 @@ const api = {
     async aiAvailable() {
         const result = await request("/health/ai");
         return result.ai_available !== false;
+    },
+
+    /* This month's Kakeibo review as Markdown:
+     *   {success, report: {month, title, markdown, generated}}
+     * The backend keeps the document in Supabase Storage, so only the first call
+     * of the month is slow -- `generated` says whether this call was that one.
+     * Pass "YYYY-MM" to read an earlier month. */
+    monthlyReport(month) {
+        const query = month ? `?month=${encodeURIComponent(month)}` : "";
+        return request(`/monthly-report${query}`, { authed: true });
+    },
+
+    /* Rewrite the review from the current expenses. POST rather than GET because
+     * it costs a model call -- never fire it from a page load. */
+    refreshMonthlyReport(month) {
+        return request("/monthly-report", {
+            method: "POST",
+            authed: true,
+            body: { month: month || null },
+        });
+    },
+
+    /* Just email + name, for the profile page header. Not the same thing as
+     * profile() below -- that's the AI-written interview summary. */
+    account() {
+        return request("/account", { authed: true });
+    },
+
+    /* The stored profile from the onboarding interview:
+     *   {success, markdown}
+     * `markdown` is null when the interview has not been done yet -- a normal
+     * state, not an error. */
+    profile() {
+        return request("/profile", { authed: true });
+    },
+
+    /* Summarize an interview into a profile and store it. `transcript` is a
+     * string or a list of Q&A lines. Running it again replaces the profile. */
+    submitInterview(transcript) {
+        return request("/profile/interview", {
+            method: "POST",
+            authed: true,
+            body: { transcript },
+        });
+    },
+
+    /* The dashboard companion's current mood/level, recomputed from real
+     * expense/budget/reflection data on every call:
+     *   {success, companion: {name, mood, level, stage, streak, dialogue,
+     *                         last_interacted_at}}
+     * Purely cosmetic -- nothing else on the page depends on this call. */
+    companion() {
+        return request("/companion", { authed: true });
+    },
+
+    /* Give the companion a name. Cosmetic only, same shape as companion(). */
+    setCompanionName(name) {
+        return request("/companion/name", {
+            method: "POST",
+            authed: true,
+            body: { name },
+        });
+    },
+
+    /* The plain feed button -- free, instant, no chat message needed.
+     * Returns {success, companion: {happiness, hunger}}. */
+    feedCompanion() {
+        return request("/companion/feed", { method: "POST", authed: true });
+    },
+
+    /* No login needed. False means the companion widget is turned off
+     * server-side (COMPANION_ENABLED=false, or the module was removed), and
+     * the dashboard should render nothing for it.
+     *
+     * Fails OPEN on purpose, same as aiAvailable(): if the health check
+     * itself cannot be reached, the answer is unknown, and hiding a harmless
+     * cosmetic widget over an unanswered question is worse than trying and
+     * letting a real error surface instead. */
+    async companionAvailable() {
+        const result = await request("/health/companion");
+        return result.companion_available !== false;
     },
 };

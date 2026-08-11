@@ -84,6 +84,28 @@ def get_user_id(token):
     except Exception as e:
         return (False,  str(e))
 
+def get_account(token):
+# For the profile page: the caller's email and display name. Separate from
+# get_user_id, which only returns the uuid every other endpoint needs -- this
+# one exists purely to have something human-readable to show on screen.
+    try:
+        response = supabase_client.auth.get_user(token)
+
+        if (response == None or response.user == None):
+            return (False, "Invalid or expired token")
+
+        metadata = response.user.user_metadata or {}
+        name = metadata.get("full_name") or metadata.get("display_name") or ""
+
+        return (True, {
+            "email": response.user.email,
+            "name": name,
+        })
+    except AuthApiError as e:
+        return (False,  str(e))
+    except Exception as e:
+        return (False,  str(e))
+
 def client_for_token(token):
 # Builds a throwaway Supabase client that talks to the database AS the logged-in
 # user, for one request only.
@@ -101,3 +123,16 @@ def client_for_token(token):
         key,
         options=ClientOptions(headers={"Authorization": f"Bearer {token}"}),
     )
+
+def caller_client(token):
+# The two steps every expenses/fees function needs, in one call: work out who is
+# asking, and build a client that talks to the database AS them.
+#
+# Returns (uuid, client) once the token checks out, or (None, error_message) if it
+# does not -- so callers can hand the error straight back instead of blowing up on
+# a None user, which is what the endpoints used to do when no token was sent.
+    ok, result = get_user_id(token)
+    if not ok:
+        return (None, result)
+
+    return (result, client_for_token(token))

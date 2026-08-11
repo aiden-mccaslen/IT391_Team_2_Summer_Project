@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monthly review | Meticulous Budgeting</title>
+  <link rel="stylesheet" href="../css/style.css" type="text/css">
+  <script src="../javascript/theme.js"></script>
+</head>
+
+<!--
+  The Kakeibo monthly review. The document itself is written by the coach and
+  stored as Markdown in Supabase Storage, so this page is mostly a renderer:
+  monthly.js fetches GET /monthly-report and hands the Markdown to markdown.js.
+
+  Regenerating costs a model call, which is why it is a button the user presses
+  and never something this page does on load.
+-->
+<body class="dashboard">
+
+  <header class="app-header">
+    <div class="wrap">
+      <a class="brand" href="home.html">
+        <span class="brand-mark" aria-hidden="true">$</span>
+        <span>Meticulous Budgeting</span>
+      </a>
+
+      <nav class="site-nav" aria-label="Main">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="expenses.html">Expenses</a>
+        <a href="monthly.html" aria-current="page">Monthly review</a>
+        <a href="chat.html">Coach</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="wrap">
+
+      <h1 id="reportTitle">Monthly review</h1>
+      <p class="stat-sub" id="reportSubtitle">Loading this month&rsquo;s review&hellip;</p>
+
+      <article class="card" style="margin-top:24px">
+        <!-- The rendered Markdown lands here. Until then this line is what the
+             user sees, so it says what is happening rather than sitting blank. -->
+        <div class="report-body" id="reportBody">
+          <p>Your coach is reading this month&rsquo;s spending&hellip;</p>
+        </div>
+      </article>
+
+      <p style="margin-top:20px">
+        <button class="btn btn-gold btn-pill" id="refreshBtn" type="button" hidden>
+          Write it again
+        </button>
+        <span class="stat-sub" id="refreshNote" hidden></span>
+      </p>
+
+    </div>
+  </main>
+
+  <script src="../javascript/api.js"></script>
+  <script src="../javascript/markdown.js"></script>
+  <script src="../javascript/monthly.js"></script>
+</body>
+
+</html>

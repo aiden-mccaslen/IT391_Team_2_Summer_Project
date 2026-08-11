@@ -1,181 +1,176 @@
 <!DOCTYPE html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Expenses</title>
-        <link rel="stylesheet" href="../css/style.css" type="text/css">
-        <link rel="stylesheet" href="../css/expenses.css" type="text/css">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Expenses | Meticulous Budgeting</title>
+    <link rel="stylesheet" href="../css/style.css" type="text/css">
+    <script src="../javascript/theme.js"></script>
+</head>
 
-    </head>
+<body class="dashboard">
 
-    <header>
-        <div class="toprightdot"></div>
-        <h1>Meticulous Budgeting</h1>
-        <nav>
-        <a href="home.html">Home page</a>
-        </nav>
+    <header class="app-header">
+        <div class="wrap">
+            <a class="brand" href="dashboard.html">
+                <span class="brand-mark" aria-hidden="true">&#165;</span>
+                <span>Meticulous Budgeting</span>
+            </a>
+
+            <nav class="site-nav" aria-label="Main">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="expenses.html" aria-current="page">Expenses</a>
+                <a href="chat.html">Coach</a>
+
+                <div class="profile">
+                    <button class="avatar-btn" id="avatarBtn" type="button"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+                        <span id="avatarInitials" aria-hidden="true">&#183;&#183;</span>
+                        <span class="visually-hidden">Open profile menu</span>
+                    </button>
+
+                    <div class="profile-menu" id="profileMenu" hidden>
+                        <a href="profile.html">Profile</a>
+                        <a href="profile.html#settings">Settings</a>
+                        <!-- The only upgrade cue in the app. Nothing on this page is gated. -->
+                        <a class="menu-premium" href="profile.html#premium">Premium &#9733;</a>
+                        <a href="login.html" id="logoutLink">Log out</a>
+                    </div>
+                </div>
+            </nav>
+        </div>
     </header>
 
-    <div class="expenses_welcome">
-        <h2>
-            Enter your expenses and funds here!
-        </h2>
-    </div>
+    <main class="page">
+        <div class="wrap">
 
-    <main>
-        <!-- I need to clear this form after it's submitted -->
-        <form id="expenseForm"> 
-            <fieldset>
-                <legend>Expense</legend>
-                <label for="amount">Amount ($)</label>      
-                <input
-                    type="number"
-                    id="amount"
-                    name="amount"
-                    placeholder="Enter the amount of this expense"
-                    required
-                >
-                <br>
+            <div class="dash-greeting">
+                <h1>Enter your expenses and funds</h1>
+                <p>Log a purchase or add funds to keep your 50/30/20 split current.</p>
+            </div>
 
-                <label for="date">Date Purchased</label>
-                <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    
-                /> <!-- Leaving this as not required since people might forget the date of a purchase -->
+            <div class="expense-layout">
+                <section class="card">
+                    <div class="card-title">
+                        <h3>Add an expense</h3>
+                    </div>
 
-                <div>Category of Expense:</div>
-                <input
-                    type="radio"
-                    name="category"
-                    id="Rent/Mortgage"
-                    value="Rent/Mortgage"
-                    required
-                />
-                <label for="Rent/Mortgage">Rent/Mortgage</label>
-                <br>
-                    
+                    <form id="expenseForm">
+                        <label for="amount">Amount ($)</label>
+                        <input
+                            type="number"
+                            id="amount"
+                            name="amount"
+                            placeholder="Enter the amount of this expense"
+                            required
+                        >
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Utilities"
-                    value="Utilities"
-                />
-                <label for="Utilities">Utilities</label>
-                <br>
+                        <label for="date">Date purchased</label>
+                        <input
+                            type="date"
+                            id="date"
+                            name="date"
+                        /> <!-- Leaving this as not required since people might forget the date of a purchase -->
 
+                        <fieldset class="radio-fieldset">
+                            <legend>Category</legend>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Rent/Mortgage" required>
+                                    <span>Rent/Mortgage</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Utilities">
+                                    <span>Utilities</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Car Payment">
+                                    <span>Car Payment</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Car Insurance">
+                                    <span>Car Insurance</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Streaming services">
+                                    <span>Streaming Services</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Groceries">
+                                    <span>Groceries</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Personal">
+                                    <span>Personal</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="category" value="Unexpected">
+                                    <span>Unexpected</span>
+                                </label>
+                            </div>
+                        </fieldset>
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Car Payment"
-                    value="Car Payment"
-                />
-                <label for="Car Payment">Car Payment</label>
-                <br>
+                        <button type="submit" class="btn-block">Add expense</button>
+                    </form>
+                </section>
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Car Insurance"
-                    value="Car Insurance"
-                />
-                <label for="Car Insurance">Car Insurance</label>
-                <br>
+                <section class="card">
+                    <div class="card-title">
+                        <h3>Add funds</h3>
+                    </div>
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Streaming Services"
-                    value="Streaming services"
-                />
-                <label for="Streaming Services">Streaming Services</label>
-                <br>
+                    <form id="fundForm">
+                        <label for="fundAmount">Amount ($)</label>
+                        <input
+                            type="number"
+                            id="fundAmount"
+                            name="amount"
+                            placeholder="Enter the fund here"
+                            required
+                        >
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Groceries"
-                    value="Groceries"
-                />
-                <label for="Groceries">Groceries</label>
-                <br>
+                        <fieldset class="radio-fieldset">
+                            <legend>Account</legend>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="account" value="checking" required>
+                                    <span>Checking</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="account" value="savings">
+                                    <span>Savings</span>
+                                </label>
+                            </div>
+                        </fieldset>
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Personal"
-                    value="Personal"
-                />
-                <label for="Personal">Personal</label>
-                <br>
+                        <button type="submit" class="btn-block">Add funds</button>
+                    </form>
+                </section>
+            </div>
 
-                <input
-                    type="radio"
-                    name="category"
-                    id="Unexpected"
-                    value="Unexpected"
-                />
-                <label for="Unexpected">Unexpected</label>
-                <br>
-
-                
-                
-
-
-                <br>
-                <input type="submit"/>
-            </fieldset>
-        </form>
-
-        <form id="fundForm">
-            <fieldset>
-                <legend>Credit</legend>
-                <label for="amount">Amount ($)</label>      
-                <input
-                    type="number"
-                    id="amount"
-                    name="amount"
-                    placeholder="Enter the fund here"
-                    required
-                >
-                <br>
-
-                <div>Account:</div>
-                <input
-                    type="radio"
-                    name="category"
-                    id="Checking"
-                    value="checking"
-                    required
-                />
-                <label for="Checking">Checking</label>
-                <br>
-                    
-
-                <input
-                    type="radio"
-                    name="category"
-                    id="Savings"
-                    value="savings"
-                />
-                <label for="Savings">Savings</label>
-                <br>
-
-
-
-                <br>
-                <input type="submit"/>
-            </fieldset>
-        </form>
-        
-        <!-- <pre id="log"></pre> -->
-        <p>Getting started on tracking expenses</p>
+        </div>
     </main>
 
-    <body>
-        <script src="../javascript/expenses.js"></script>
-    </body>
+    <!-- Docked coach bar. Sends straight to /chat; the reply opens in the full
+         conversation view so the thread is never lost behind a page change. -->
+    <div class="chat-dock">
+        <form id="dockForm">
+            <span class="dock-label">
+                <span aria-hidden="true">&#128172;</span>
+                <span>Ask your Kakeibo guide</span>
+            </span>
+
+            <label class="visually-hidden" for="dockInput">Message your coach</label>
+            <input type="text" id="dockInput" placeholder="Ask your Kakeibo guide&hellip;"
+                   autocomplete="off" maxlength="1000" required>
+
+            <button type="submit">Send</button>
+        </form>
+    </div>
+
+    <script src="../javascript/api.js"></script>
+    <script src="../javascript/profile-menu.js"></script>
+    <script src="../javascript/chat-dock.js"></script>
+    <script src="../javascript/expenses.js"></script>
+</body>
 </html>

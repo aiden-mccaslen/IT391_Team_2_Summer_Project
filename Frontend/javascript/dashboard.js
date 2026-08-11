@@ -1,108 +1,78 @@
-/* Dashboard behaviour: profile menu, the docked coach bar, the AI health check,
- * and the 50/30/20 figures from GET /budget.
+/* Dashboard behaviour: greeting, the weekly reflection card and the 50/30/20
+ * figures from GET /budget.
+ * The profile dropdown lives in profile-menu.js and the docked coach bar in
+ * chat-dock.js -- both shared with expenses.html and chat.html.
  *
  * There is no historical spending series behind /budget, so this page states
  * current totals rather than drawing a trend it would have to invent.
  */
 
-const avatarBtn = document.getElementById("avatarBtn");
-const profileMenu = document.getElementById("profileMenu");
-const logoutLink = document.getElementById("logoutLink");
-const dockForm = document.getElementById("dockForm");
-const dockInput = document.getElementById("dockInput");
 const reflectionForm = document.getElementById("reflectionForm");
 
 /* A logged-out visitor gets sent to login rather than a page of 401s. */
 auth.require();
 
-/* Profile dropdown ------------------------------------------------------- */
-if (avatarBtn && profileMenu) {
-    avatarBtn.addEventListener("click", function (event) {
-        event.stopPropagation();
-        const isOpen = !profileMenu.hidden;
-        profileMenu.hidden = isOpen;
-        avatarBtn.setAttribute("aria-expanded", String(!isOpen));
-    });
+/* Weekly reflection ------------------------------------------------------
+ * One coach question per week from GET /weekly-reflection, and the answer goes
+ * back with POST. Submitting is Enter in the input -- the card has no button.
+ * ------------------------------------------------------------------------- */
+const reflectionInput = document.getElementById("reflectionInput");
+const reflectionQuestion = document.getElementById("reflectionQuestion");
+const reflectionStatus = document.getElementById("reflectionStatus");
 
-    // Click-away and Escape both close it, so it never traps focus.
-    document.addEventListener("click", function () {
-        profileMenu.hidden = true;
-        avatarBtn.setAttribute("aria-expanded", "false");
-    });
-
-    document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && !profileMenu.hidden) {
-            profileMenu.hidden = true;
-            avatarBtn.setAttribute("aria-expanded", "false");
-            avatarBtn.focus();
-        }
-    });
-
-    profileMenu.addEventListener("click", function (event) {
-        event.stopPropagation();
-    });
-}
-
-if (logoutLink) {
-    logoutLink.addEventListener("click", function (event) {
-        event.preventDefault();
-        auth.clear();
-        window.location.href = "home.html";
-    });
-}
-
-/* Docked coach bar ------------------------------------------------------- */
-if (dockForm) {
-    dockForm.addEventListener("submit", async function (event) {
-        event.preventDefault();
-
-        const message = dockInput.value.trim();
-        if (!message) {
-            return;
-        }
-
-        const button = dockForm.querySelector("button");
-        button.disabled = true;
-        button.textContent = "Sending…";
-
-        const result = await api.chat(message, null);
-
-        button.disabled = false;
-        button.textContent = "Send";
-
-        if (result.success) {
-            // Hand the new conversation to the full chat view, which loads the
-            // transcript from the backend -- the reply is never held in memory.
-            dockInput.value = "";
-            window.location.href =
-                `chat.html?conversation=${encodeURIComponent(result.conversation_id)}`;
-            return;
-        }
-
-        // Rate limits, a coach outage, an expired session -- all arrive as a
-        // plain sentence the backend already made safe to display.
-        alert(result.message);
-    });
-}
-
-/* The weekly reflection card is a UI stub until there is somewhere to store
-   the answer. Say so rather than silently dropping what the user typed. */
-if (reflectionForm) {
-    reflectionForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        alert("Saving weekly reflections is not wired up yet.");
-    });
-}
-
-/* Coach availability ----------------------------------------------------- */
-(async function checkCoach() {
-    const available = await api.aiAvailable();
-    if (!available && dockForm) {
-        dockInput.disabled = true;
-        dockInput.placeholder = "The coach is unavailable right now.";
-        dockForm.querySelector("button").disabled = true;
+function showReflectionStatus(text) {
+    if (reflectionStatus) {
+        reflectionStatus.textContent = text;
+        reflectionStatus.hidden = !text;
     }
-})();
+}
+
+if (reflectionForm) {
+    (async function loadReflection() {
+        const result = await api.weeklyReflection();
+
+        if (!result.success) {
+            if (reflectionQuestion) {
+                reflectionQuestion.textContent =
+                    "This week's question could not be loaded.";
+            }
+            reflectionInput.disabled = true;
+            showReflectionStatus(result.message);
+            return;
+        }
+
+        const reflection = result.reflection || {};
+        if (reflectionQuestion && reflection.question) {
+            reflectionQuestion.textContent = `"${reflection.question}"`;
+        }
+
+        // Coming back later in the same week shows what was written, editable --
+        // saving again replaces it.
+        if (reflection.answer) {
+            reflectionInput.value = reflection.answer;
+            showReflectionStatus("Saved. Press Enter to update it.");
+        }
+    })();
+
+    reflectionForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const answer = reflectionInput.value.trim();
+        if (!answer) {
+            return;
+        }
+
+        reflectionInput.disabled = true;
+        showReflectionStatus("Saving…");
+
+        const result = await api.saveWeeklyReflection(answer);
+
+        reflectionInput.disabled = false;
+        showReflectionStatus(result.success
+            ? "Saved. Press Enter to update it."
+            : result.message);
+    });
+}
 
 /* Greeting --------------------------------------------------------------- */
 (function greet() {

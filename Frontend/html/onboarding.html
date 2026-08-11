@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>How it works | Meticulous Budgeting</title>
   <link rel="stylesheet" href="../css/style.css" type="text/css">
+  <script src="../javascript/theme.js"></script>
 </head>
 
 <body class="onboarding">
@@ -44,7 +45,7 @@
             this, did I rush &mdash; and left to make your own call.
           </p>
 
-          <a class="btn btn-gold btn-pill" href="dashboard.html">
+          <a class="btn btn-gold btn-pill" href="#interview" id="startInterviewLink">
             Start your journey <span aria-hidden="true">&rarr;</span>
           </a>
 
@@ -80,6 +81,73 @@
       </section>
     </div>
 
+    <!--
+      The initial interview. Five short questions asked one at a time, then the
+      whole transcript goes to POST /profile/interview, which summarizes it into
+      the profile stored for this user. One model call for the whole interview --
+      the questions themselves are fixed, so nothing is spent walking through it.
+    -->
+    <div class="wrap">
+      <section id="interview" style="margin-top:48px">
+        <h2>Your initial interview</h2>
+        <p style="max-width:52ch">
+          Five questions, about a minute. Your answers become the profile your
+          coach uses to make its questions about <em>your</em> money, not money in
+          general.
+        </p>
+
+        <article class="card" style="margin-top:20px; max-width:640px">
+
+          <!-- Signed-out visitors see this instead of the form: the profile is
+               saved against an account, so there is nowhere to put it yet. -->
+          <div id="interviewLocked" hidden>
+            <p>
+              <a href="signup.html">Create an account</a> or
+              <a href="login.html">log in</a> to take the interview &mdash; your
+              profile is saved to your account.
+            </p>
+          </div>
+
+          <div id="interviewForm" hidden>
+            <p class="stat-sub" id="interviewProgress">Question 1 of 5</p>
+            <p class="ai-prompt on-light">
+              <strong>Coach</strong>
+              <span id="interviewQuestion"></span>
+            </p>
+
+            <form id="answerForm">
+              <label class="visually-hidden" for="answerInput">Your answer</label>
+              <input type="text" id="answerInput" placeholder="Type your answer&hellip;"
+                     autocomplete="off" required>
+              <button class="btn btn-gold btn-pill" type="submit" id="answerBtn"
+                      style="margin-top:12px">Next</button>
+            </form>
+
+            <p class="stat-sub" id="interviewStatus" hidden></p>
+          </div>
+
+          <!-- The finished profile, rendered from the Markdown the backend
+               stored. Also what a returning user sees instead of the form. -->
+          <div id="interviewResult" hidden>
+            <div class="report-body" id="profileBody"></div>
+            <p style="margin-top:20px">
+              <a class="btn btn-gold btn-pill" href="dashboard.html">
+                Go to your dashboard <span aria-hidden="true">&rarr;</span>
+              </a>
+            </p>
+            <p class="field-note" style="margin-top:12px">
+              <a href="#" id="retakeLink">Take the interview again</a>
+            </p>
+          </div>
+
+        </article>
+      </section>
+    </div>
+
   </main>
+
+  <script src="../javascript/api.js"></script>
+  <script src="../javascript/markdown.js"></script>
+  <script src="../javascript/onboarding.js"></script>
 </body>
 </html>
