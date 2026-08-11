@@ -52,7 +52,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY") or "missing-key",
 # Extendibility note: this framework talks to the model API in exactly one
 # place (_model_call). To change models, set KAKEIBO_MODEL or pass model=...;
 # to swap providers entirely, _model_call is the only function to rewrite.
-DEFAULT_MODEL = os.getenv("KAKEIBO_MODEL", "gpt-4o")
+DEFAULT_MODEL = os.getenv("KAKEIBO_MODEL", "gpt-4o-mini")
 
 
 # ---------------------------------------------------------------------------
